@@ -97,7 +97,8 @@ def _is_table_separator(line: str) -> bool:
 def _passages(text: str) -> list[str]:
     """Candidate snippets: table rows kept whole, prose joined across line wraps and split into
     sentences, and very short pieces (PDF table cells) merged with the next."""
-    pieces: list[str] = []
+    # None marks a point that passages must not be merged across.
+    pieces: list[str | None] = []
     paragraph: list[str] = []
 
     def flush_paragraph() -> None:
@@ -107,6 +108,10 @@ def _passages(text: str) -> list[str]:
 
     for line in text.splitlines():
         if _is_table_separator(line):
+            # Not part of any snippet, and nothing may be merged across it: a snippet must be
+            # a contiguous quote of the source.
+            flush_paragraph()
+            pieces.append(None)
             continue
         if _is_table_row(line):
             flush_paragraph()
@@ -120,6 +125,11 @@ def _passages(text: str) -> list[str]:
     passages: list[str] = []
     buffer = ""
     for piece in pieces:
+        if piece is None:
+            if buffer:
+                passages.append(buffer)
+            buffer = ""
+            continue
         buffer = f"{buffer} {piece}".strip()
         if len(buffer) >= MIN_PASSAGE_CHARACTERS:
             passages.append(buffer)

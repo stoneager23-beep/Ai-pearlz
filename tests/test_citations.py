@@ -96,3 +96,19 @@ def test_citation_at_paragraph_end_supports_the_sentences_before_it():
     resolved = resolve_citations(_draft(answer, ["S1"]), supplied)
 
     assert resolved.citations[0].snippet.startswith("| E-03 |")
+
+
+def test_snippet_is_a_contiguous_quote_even_around_a_table_separator():
+    table = (
+        "2. Warranty periods\n| Product | Warranty period |\n|---|---|\n"
+        "| AquaPearl 500 Pro | 24 months for the purifier body, pump and electronics |"
+    )
+    supplied = {"S1": scored_chunk("w::0", table, 0.7)}
+
+    resolved = resolve_citations(
+        _draft("The AquaPearl 500 Pro has 24 months [S1].", ["S1"]), supplied
+    )
+
+    snippet = resolved.citations[0].snippet
+    assert "|---|" not in snippet
+    assert snippet in " ".join(table.split())
