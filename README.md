@@ -21,11 +21,11 @@ The project is built task by task, following the assignment manual. This README 
 | T04 | Embeddings | Done |
 | T05 | Vector store | Done |
 | T06 | Retriever comparison and relevance gate | Done |
-| T07 | The RAG chain | Not started |
-| T08 | Prompt engineering for grounding | Not started |
-| T09 | Conversational memory and follow-ups | Not started |
-| T10 | Source attribution | Not started |
-| T11 | Evaluation | Not started |
+| T07 | The RAG chain | Done |
+| T08 | Prompt engineering for grounding | Done |
+| T09 | Conversational memory and follow-ups | Done |
+| T10 | Source attribution | Done |
+| T11 | Evaluation | Done |
 | — | Streamlit app and deployment | Not started |
 
 ## Prerequisites
@@ -110,6 +110,40 @@ The chat and the web app load the saved index at start-up and build it only if i
 or out of date. An index built with a different embedding model or different chunk settings
 is never used; it is rebuilt.
 
+## Chatting on the command line
+
+```bash
+python -m src.app_cli                          # default model (gpt-4.1-mini)
+python -m src.app_cli --model gpt-4o           # another offered model
+python -m src.app_cli --product "AquaPearl 300" --doc-type policy   # restrict retrieval
+```
+
+Each answer shows its sources (document, page or section, and a short verbatim snippet), a
+confidence of high, partial or none, and, for follow-up questions, the standalone question that
+was actually searched. Commands: `/reset` starts a new conversation, `/model gpt-4o` switches
+model, `/verbose` shows what happened behind each answer (retrieved chunks with scores, gate
+decision, tokens, latency), `/quit` leaves. Every turn is logged as one JSON line in
+`logs/supportpearlz.log`.
+
+## Evaluation and experiments
+
+```bash
+python -m evaluation.run_eval                     # the 26-case test set; writes eval_results.md/.json
+python -m evaluation.run_eval --cases T-07,T-08   # a subset
+python -m evaluation.run_eval --rescore           # re-apply the rubric to saved answers (no API calls)
+python -m evaluation.experiments.chunking         # Task 03: 12 chunking configurations
+python -m evaluation.experiments.embedding_diagnostic   # Task 04
+python -m evaluation.experiments.retrievers       # Task 06: 7 retrieval strategies
+python -m evaluation.experiments.threshold        # Task 06: relevance-gate calibration
+python -m evaluation.experiments.prompts          # Task 08: weak versus grounded prompt
+python -m evaluation.experiments.conversation     # Task 09: follow-ups and a topic switch
+python -m evaluation.experiments.citations        # Task 10: citations checked against the sources
+```
+
+All results are written to `evaluation/results/`. The human review of the evaluation, with the
+failure analysis, is `evaluation/results/eval_review.md`. A full evaluation run costs about
+51,000 input tokens for the system plus the judge's calls.
+
 ## The OpenAI API key
 
 - **Streamlit app:** always asks the visitor for their own key, locally and when deployed. It
@@ -151,6 +185,13 @@ app's secrets. Invalid values stop the program with one message naming the varia
 | `RETRIEVAL_FETCH_K` | `20` | Candidates considered before MMR or metadata filtering. |
 | `RETRIEVAL_MMR_LAMBDA` | `0.5` | MMR balance between relevance (1.0) and diversity (0.0). |
 | `RELEVANCE_THRESHOLD` | `0.34` | Minimum cosine similarity of the best chunk; below it the question is refused without calling the model. Calibrated in T06. |
+| `CONFIDENCE_HIGH_SCORE` | `0.50` | Below this best-chunk similarity, a "high" confidence becomes "partial". |
+| `MAX_CONTEXT_CHARACTERS` | `8000` | Most retrieved text put into one prompt; drops are logged. |
+| `HISTORY_TURNS` | `4` | Earlier turns used to rewrite follow-up questions. |
+| `ANSWER_PROMPT_VERSION` | `v2` | `v1` is the weak baseline kept for the T08 comparison. |
+| `CONDENSE_PROMPT_VERSION` | `c2` | Follow-up rewrite prompt version. |
+| `SUPPORT_CONTACT` | email, toll-free, WhatsApp | Human contact given in refusals; must match the documents. |
+| `EVAL_JUDGE_MODEL` | `gpt-4.1` | Model that judges groundedness in the evaluation. |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR`. |
 | `LOG_DIR` | `logs` | Folder for the rotating log file. Logs also go to stdout. |
 
@@ -199,11 +240,20 @@ src/
   retrieval/search.py   `python -m src.retrieval.search`
   retrieval/retriever.py  scored retriever (similarity or MMR, metadata filters) and relevance gate
   llm/clients.py        the only place OpenAI objects are created (always from an explicit key)
+  chains/schemas.py     AnswerDraft (model output) and SupportResponse (what every interface gets)
+  chains/context.py     labelled [S1]..[Sk] context blocks within a character budget
+  chains/prompts.py     versioned answer (v1, v2) and rewrite (c1, c2) prompts
+  chains/memory.py      bounded history and follow-up rewriting
+  chains/citations.py   citation validation, de-duplication and snippets
+  chains/rag_chain.py   the composed LCEL chain
+  chains/session.py     one conversation: memory, error handling, per-turn logging
+  app_cli.py            `python -m src.app_cli`
   errors.py             every failure to one short, human message
-  chains/               filled in by later tasks
 evaluation/
   retrieval_questions.json  retrieval ground truth for the chunking and retriever experiments
-  experiments/          runnable experiments (chunking, embedding diagnostic, ...)
+  test_questions.json   the frozen 26-case evaluation set
+  run_eval.py           the evaluation harness; scoring.py is the rubric, judge.py the groundedness judge
+  experiments/          runnable experiments (chunking, embeddings, retrievers, threshold, prompts, ...)
   results/              generated reports and experiment tables
 tests/                  pytest suite (never calls OpenAI)
 docs/CODE_WALKTHROUGH.md  what every file does and why, task by task
@@ -215,3 +265,6 @@ docs/CODE_WALKTHROUGH.md  what every file does and why, task by task
   the PDF, CSV and text loaders still live only there, so it is pinned at 0.4.2 and works, but
   it no longer receives fixes.
 - The four chat models in the catalogue are scheduled to leave the OpenAI API on 2027-01-14.
+- Multi-part policy questions whose deciding clause sits inside a long numbered list can miss it:
+  the list is one chunk (T-08 in the evaluation). See `evaluation/results/eval_review.md`.
+- Temperature 0 makes answers nearly, not perfectly, repeatable across runs.
