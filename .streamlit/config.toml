@@ -1,0 +1,30 @@
+# Streamlit settings for SupportPearlz, used locally and on Community Cloud.
+# The theme mirrors the design tokens in app/ui/theme.py (tests/test_app_ui.py keeps them equal),
+# so Streamlit's own widgets and pop-overs match the custom stylesheet.
+
+[client]
+# Visitors see a generic message for an unexpected error; the details go to the server log.
+showErrorDetails = "none"
+toolbarMode = "minimal"
+showSidebarNavigation = false
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+base = "dark"
+primaryColor = "#7FE3DA"
+backgroundColor = "#070B14"
+secondaryBackgroundColor = "#0E1728"
+textColor = "#F3EEE6"
+linkColor = "#7FE3DA"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap"
+headingFont = "Fraunces:https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..700&display=swap"
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+baseRadius = "12px"
+buttonRadius = "12px"
+showSidebarBorder = true
+
+[theme.sidebar]
+backgroundColor = "#0B1220"
+secondaryBackgroundColor = "#121D33"

@@ -1,0 +1,238 @@
+/* SupportPearlz stylesheet. Every value comes from the tokens that app/ui/theme.py
+   defines once as CSS custom properties on :root. */
+/* ---- Base ---------------------------------------------------------------------------- */
+html, body, .stApp, [data-testid="stAppViewContainer"] {
+  background:
+    radial-gradient(900px 480px at 50% -8%, rgba(127, 227, 218, 0.07), transparent 62%),
+    var(--ink-950);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-md);
+  line-height: var(--leading-md);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3, .sp-display { font-family: var(--font-display); font-weight: 400; letter-spacing: -0.01em; color: var(--text); }
+p, li, label, span, div { font-family: var(--font-body); }
+a { color: var(--aqua); text-decoration: none; border-bottom: 1px solid var(--aqua-line); }
+a:hover { border-bottom-color: var(--aqua); }
+code, .sp-mono { font-family: var(--font-mono); font-size: var(--text-xs); }
+*:focus-visible { outline: 2px solid var(--aqua) !important; outline-offset: 2px; border-radius: var(--radius-sm); }
+::selection { background: var(--aqua-soft); }
+
+/* ---- Hide stock chrome ------------------------------------------------------------- */
+[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"],
+[data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], #MainMenu, footer,
+.stDeployButton { display: none !important; }
+
+/* ---- Layout ------------------------------------------------------------------------ */
+.block-container, [data-testid="stMainBlockContainer"] {
+  max-width: var(--content-width); padding: var(--space-5) var(--space-5) 96px;
+}
+[data-testid="stVerticalBlock"] { gap: var(--space-4); }
+
+/* ---- Sidebar ----------------------------------------------------------------------- */
+[data-testid="stSidebar"] { background: var(--ink-900); border-right: 1px solid var(--hairline); }
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] { gap: var(--space-3); }
+[data-testid="stSidebarCollapsedControl"] button, [data-testid="stSidebarCollapseButton"] button { color: var(--text-muted); }
+.sp-side-label { font-size: var(--text-xs); line-height: var(--leading-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-muted); margin: var(--space-3) 0 var(--space-1); }
+
+/* ---- Buttons ----------------------------------------------------------------------- */
+.stButton > button, .stFormSubmitButton > button, [data-testid^="stBaseButton"] {
+  background: var(--ink-800); color: var(--text); border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-md); font-weight: 500; font-size: var(--text-sm);
+  padding: var(--space-2) var(--space-4); min-height: 40px;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+}
+.stButton > button:hover, [data-testid^="stBaseButton"]:hover { background: var(--ink-700); border-color: var(--aqua-line); color: var(--text); }
+.stButton > button:active, [data-testid^="stBaseButton"]:active { transform: translateY(1px); }
+[data-testid="stBaseButton-primary"], [data-testid="stBaseButton-primaryFormSubmit"], .stFormSubmitButton > button {
+  background: var(--aqua); color: var(--aqua-ink); border-color: transparent; font-weight: 600;
+}
+[data-testid="stBaseButton-primary"]:hover, [data-testid="stBaseButton-primaryFormSubmit"]:hover, .stFormSubmitButton > button:hover {
+  background: #9BEDE5; color: var(--aqua-ink); border-color: transparent;
+}
+
+/* ---- Inputs ------------------------------------------------------------------------ */
+[data-testid="stTextInput"] label, [data-testid="stSelectbox"] label, [data-testid="stMultiSelect"] label {
+  color: var(--text-soft); font-size: var(--text-sm);
+}
+[data-baseweb="input"], [data-baseweb="select"] > div, [data-baseweb="base-input"] {
+  background: var(--ink-850) !important; border: 1px solid var(--hairline-strong) !important;
+  border-radius: var(--radius-md) !important; color: var(--text) !important;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+[data-baseweb="input"]:focus-within, [data-baseweb="select"] > div:focus-within { border-color: var(--aqua) !important; }
+[data-baseweb="input"] input { color: var(--text) !important; font-family: var(--font-mono); }
+[data-baseweb="tag"] { background: var(--aqua-soft) !important; color: var(--aqua) !important; border-radius: var(--radius-pill) !important; }
+[data-testid="stForm"] { border: none; padding: 0; }
+
+/* ---- Conversation (keyed containers: st.container(key="sp-...")) ------------------ */
+[class*="st-key-sp-user-"] { margin-top: var(--space-4); }
+.sp-user-text {
+  width: fit-content; max-width: 78%; margin-left: auto; white-space: pre-wrap;
+  background: var(--ink-800); border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg) var(--radius-lg) var(--radius-sm) var(--radius-lg);
+  padding: var(--space-3) var(--space-4); color: var(--text);
+  animation: sp-rise var(--dur-base) var(--ease-out) both;
+}
+[class*="st-key-sp-answer-"] { animation: sp-rise var(--dur-base) var(--ease-out) both; gap: var(--space-3); }
+[class*="st-key-sp-answer-"] p { margin: 0 0 var(--space-2); }
+[data-testid="stBottom"], [data-testid="stBottomBlockContainer"] { background: linear-gradient(to top, var(--ink-950) 70%, transparent); }
+[data-testid="stChatInput"] {
+  background: var(--ink-850); border: 1px solid var(--hairline-strong); border-radius: var(--radius-lg);
+  box-shadow: var(--elevation);
+}
+[data-testid="stChatInput"]:focus-within { border-color: var(--aqua-line); }
+[data-testid="stChatInput"] textarea { color: var(--text); font-family: var(--font-body); font-size: var(--text-md); }
+[data-testid="stChatInputSubmitButton"] { color: var(--aqua); }
+
+/* ---- Gate card and example questions ----------------------------------------------- */
+.st-key-sp-gate-card {
+  max-width: 520px; margin: 0 auto; background: linear-gradient(180deg, var(--ink-850), var(--ink-900));
+  border: 1px solid var(--hairline); border-radius: var(--radius-lg); padding: var(--space-5);
+  box-shadow: var(--elevation); gap: var(--space-3); animation: sp-rise var(--dur-slow) var(--ease-out) 80ms both;
+}
+.st-key-sp-gate-card h3 { font-size: var(--text-lg); line-height: var(--leading-lg); margin: 0 0 var(--space-2); }
+.st-key-sp-gate-card p { color: var(--text-soft); font-size: var(--text-sm); line-height: var(--leading-sm); margin: 0; }
+.st-key-sp-gate-card .sp-note { margin-top: var(--space-1); }
+[class*="st-key-sp-example-"] button {
+  min-height: 72px; justify-content: flex-start; text-align: left; white-space: normal;
+  background: var(--ink-900); border-color: var(--hairline); padding: var(--space-3) var(--space-4);
+}
+[class*="st-key-sp-example-"] button p { font-size: var(--text-sm); line-height: var(--leading-sm); color: var(--text-soft); }
+[class*="st-key-sp-example-"] button:hover p { color: var(--text); }
+.sp-center { text-align: center; }
+
+/* ---- Expanders, status ------------------------------------------------------------ */
+[data-testid="stExpander"] details { background: var(--ink-900); border: 1px solid var(--hairline); border-radius: var(--radius-md); }
+[data-testid="stExpander"] summary { font-size: var(--text-sm); color: var(--text-soft); }
+[data-testid="stExpander"] summary:hover { color: var(--text); }
+[data-testid="stAlert"] { background: var(--ink-850); border: 1px solid var(--hairline-strong); border-radius: var(--radius-md); color: var(--text); }
+
+/* ---- Scrollbars -------------------------------------------------------------------- */
+* { scrollbar-width: thin; scrollbar-color: var(--ink-700) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--ink-700); border-radius: var(--radius-pill); border: 3px solid var(--ink-950); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* ---- Motion ------------------------------------------------------------------------ */
+@keyframes sp-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes sp-shimmer { from { background-position: -240px 0; } to { background-position: 240px 0; } }
+@keyframes sp-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* ---- Brand and hero ---------------------------------------------------------------- */
+.sp-icon { display: inline-block; vertical-align: -3px; flex: none; }
+.sp-brand { display: flex; align-items: center; gap: var(--space-2); font-family: var(--font-display); font-size: var(--text-lg); color: var(--text); }
+.sp-brand .sp-icon { color: var(--aqua); }
+.sp-hero { text-align: center; margin: calc(-1 * var(--space-4)) auto var(--space-5); max-width: 560px; animation: sp-rise var(--dur-slow) var(--ease-out) both; }
+.sp-hero h1 { font-size: var(--text-2xl); line-height: var(--leading-2xl); margin: 0 0 var(--space-3); }
+.sp-hero p { color: var(--text-soft); margin: 0; }
+.sp-eyebrow { font-size: var(--text-xs); line-height: var(--leading-xs); letter-spacing: 0.14em; text-transform: uppercase; color: var(--aqua); margin-bottom: var(--space-2); }
+
+/* ---- Cards ------------------------------------------------------------------------- */
+.sp-card {
+  background: linear-gradient(180deg, var(--ink-850), var(--ink-900)); border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg); padding: var(--space-5); box-shadow: var(--elevation);
+}
+.sp-card h3 { font-size: var(--text-lg); line-height: var(--leading-lg); margin: 0 0 var(--space-2); }
+.sp-card p { color: var(--text-soft); font-size: var(--text-sm); line-height: var(--leading-sm); margin: 0 0 var(--space-3); }
+.sp-note { display: flex; gap: var(--space-2); align-items: flex-start; color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-xs); }
+.sp-note .sp-icon { color: var(--aqua); margin-top: 1px; }
+.sp-message { display: flex; gap: var(--space-2); align-items: flex-start; padding: var(--space-3) var(--space-4); border-radius: var(--radius-md); font-size: var(--text-sm); line-height: var(--leading-sm); animation: sp-rise var(--dur-base) var(--ease-out) both; }
+.sp-message--error { background: var(--sand-soft); color: var(--sand); border: 1px solid rgba(217, 194, 154, 0.3); }
+.sp-message--ok { background: var(--aqua-soft); color: var(--aqua); border: 1px solid var(--aqua-line); }
+
+/* ---- Answer ------------------------------------------------------------------------ */
+.sp-answer { color: var(--text); font-size: var(--text-md); line-height: var(--leading-md); }
+.sp-answer p { margin: 0 0 var(--space-3); }
+.sp-ref { font-family: var(--font-mono); font-size: 11px; color: var(--aqua); background: var(--aqua-soft); border-radius: var(--radius-sm); padding: 0 5px; margin-left: 2px; vertical-align: 2px; }
+.sp-meta-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-top: var(--space-2); }
+.sp-chip { display: inline-flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); line-height: var(--leading-xs); padding: 4px 10px; border-radius: var(--radius-pill); border: 1px solid; }
+.sp-chip i { width: 34px; height: 4px; border-radius: var(--radius-pill); background: currentColor; opacity: 0.25; position: relative; overflow: hidden; }
+.sp-chip i::after { content: ""; position: absolute; inset: 0; background: currentColor; transform-origin: left; animation: sp-fill var(--dur-slow) var(--ease-out) 120ms both; }
+.sp-chip--high { color: var(--aqua); border-color: var(--aqua-line); background: var(--aqua-soft); }
+.sp-chip--high i::after { width: 100%; }
+.sp-chip--partial { color: var(--sand); border-color: rgba(217, 194, 154, 0.3); background: var(--sand-soft); }
+.sp-chip--partial i::after { width: 55%; }
+.sp-chip--none { color: var(--slate); border-color: rgba(154, 172, 191, 0.3); background: var(--slate-soft); }
+.sp-chip--none i::after { width: 12%; }
+.sp-muted { color: var(--text-muted); font-size: var(--text-xs); line-height: var(--leading-xs); }
+
+/* ---- Sources ----------------------------------------------------------------------- */
+.sp-sources { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: var(--space-2); margin-top: var(--space-3); }
+.sp-source {
+  background: var(--ink-900); border: 1px solid var(--hairline); border-radius: var(--radius-md);
+  animation: sp-rise var(--dur-base) var(--ease-out) both; animation-delay: calc(var(--i) * 70ms + 80ms);
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+.sp-source:hover { border-color: var(--aqua-line); }
+.sp-source summary { list-style: none; cursor: pointer; padding: var(--space-3); display: grid; gap: 2px; }
+.sp-source summary::-webkit-details-marker { display: none; }
+.sp-source-head { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-sm); color: var(--text); }
+.sp-source-num { font-family: var(--font-mono); font-size: 11px; color: var(--aqua); }
+.sp-source-loc { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sp-source blockquote { margin: 0; padding: 0 var(--space-3) var(--space-3); font-size: var(--text-xs); line-height: var(--leading-xs); color: var(--text-soft); border: none; }
+.sp-source[open] { border-color: var(--aqua-line); }
+
+/* ---- Refusal and error ------------------------------------------------------------- */
+.sp-refusal { border: 1px solid var(--hairline-strong); border-radius: var(--radius-lg); padding: var(--space-4); background: var(--ink-900); }
+.sp-refusal-title { display: flex; align-items: center; gap: var(--space-2); font-size: var(--text-xs); letter-spacing: 0.08em; text-transform: uppercase; color: var(--slate); margin-bottom: var(--space-2); }
+.sp-refusal .sp-action { display: inline-flex; align-items: center; gap: var(--space-2); margin-top: var(--space-3); font-size: var(--text-sm); }
+
+/* ---- Thinking skeleton ------------------------------------------------------------- */
+.sp-skeleton { display: grid; gap: var(--space-2); }
+.sp-skeleton span { height: 12px; border-radius: var(--radius-pill); background: linear-gradient(90deg, var(--ink-800) 0, var(--ink-700) 120px, var(--ink-800) 240px); background-size: 480px 100%; animation: sp-shimmer 1.4s linear infinite; }
+.sp-skeleton span:nth-child(2) { width: 82%; } .sp-skeleton span:nth-child(3) { width: 64%; }
+
+/* ---- Behind the answer ------------------------------------------------------------- */
+.sp-inspect { display: grid; gap: var(--space-3); font-size: var(--text-sm); }
+.sp-inspect dl { display: grid; grid-template-columns: 150px 1fr; gap: var(--space-1) var(--space-4); margin: 0; }
+.sp-inspect dt { color: var(--text-muted); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 3px; }
+.sp-inspect dd { margin: 0; color: var(--text); }
+.sp-hits { display: grid; gap: 6px; }
+.sp-hit { display: grid; grid-template-columns: 34px 48px 1fr; align-items: center; gap: var(--space-2); font-family: var(--font-mono); font-size: 11px; color: var(--text-soft); }
+.sp-hit b { color: var(--aqua); font-weight: 500; }
+.sp-bar { display: block; height: 4px; margin: 0 0 3px; border-radius: var(--radius-pill); background: var(--ink-700); overflow: hidden; }
+.sp-bar > span { display: block; height: 100%; background: var(--aqua); border-radius: inherit; }
+
+/* ---- Empty state and sidebar bits ---------------------------------------------------- */
+.sp-empty { text-align: center; margin: 0 auto var(--space-4); max-width: 560px; }
+.sp-empty h2 { font-size: var(--text-xl); line-height: var(--leading-xl); margin: 0 0 var(--space-2); }
+.sp-empty p { color: var(--text-soft); margin: 0; }
+.sp-chips { display: flex; justify-content: center; flex-wrap: wrap; gap: var(--space-2); margin: var(--space-4) 0 0; }
+.sp-line-chip { font-size: var(--text-xs); color: var(--text-soft); border: 1px solid var(--hairline-strong); border-radius: var(--radius-pill); padding: 4px 12px; }
+.sp-kv { display: grid; gap: 6px; }
+.sp-kv-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 var(--space-3); font-size: var(--text-xs); line-height: var(--leading-xs); }
+.sp-kv-row > span:first-child { color: var(--text-muted); }
+.sp-kv-row > span:last-child { margin-left: auto; text-align: right; color: var(--text-soft); font-family: var(--font-mono); font-size: 11px; }
+.sp-steps { margin: 0; padding-left: 18px; color: var(--text-soft); font-size: var(--text-xs); line-height: var(--leading-sm); }
+.sp-footnote { color: var(--text-muted); font-size: 11px; line-height: 16px; }
+
+/* ---- Streamlit markdown defaults, overridden for our own blocks ---------------------- */
+/* Streamlit pulls every markdown block up by 1rem to absorb a paragraph margin our blocks
+   do not have, and sizes list and definition text itself; both are reset here. */
+[data-testid="stMarkdownContainer"]:has(> [class^="sp-"]) { margin-bottom: 0; }
+[data-testid="stMarkdownContainer"] .sp-steps li { font-size: var(--text-xs); line-height: var(--leading-sm); margin: 0 0 var(--space-1); }
+[data-testid="stMarkdownContainer"] .sp-inspect dt { font-size: var(--text-xs); line-height: var(--leading-xs); }
+[data-testid="stMarkdownContainer"] .sp-inspect dd { font-size: var(--text-sm); line-height: var(--leading-sm); }
+[data-testid="stMarkdownContainer"] .sp-footnote { font-size: 11px; line-height: 16px; margin: 0; color: var(--text-muted); }
+.sp-brand { margin: 0 0 var(--space-2); }
+[data-testid="stMarkdownContainer"] :is(.sp-hero h1, .sp-empty h2) { font-weight: 500; }
+.st-key-sp-gate-card h3 { font-weight: 500; }
+[class*="st-key-sp-example-"] button * { white-space: normal !important; overflow: visible !important; text-overflow: clip !important; text-align: left; }
+[class*="st-key-sp-example-"] button > div { width: 100%; justify-content: flex-start; }
+[data-testid="stBaseButton-primaryFormSubmit"] *, [data-testid="stBaseButton-primary"] * { color: var(--aqua-ink) !important; font-weight: 600; }
+.st-key-sp-gate-card [data-testid="stForm"] { margin-top: var(--space-2); }
+
+/* ---- Small screens ----------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .block-container, [data-testid="stMainBlockContainer"] { padding: var(--space-4) var(--space-4) 140px; }
+  .sp-hero h1 { font-size: var(--text-xl); line-height: var(--leading-xl); }
+  .sp-card { padding: var(--space-4); }
+  .sp-inspect dl { grid-template-columns: 1fr; }
+  .sp-user-text { max-width: 92%; }
+  .st-key-sp-gate-card { padding: var(--space-4); }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; animation-delay: 0ms !important; transition-duration: 0.001ms !important; }
+}

@@ -1,0 +1,356 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pearl</title>
+<style>
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; }
+  #stage { position: relative; width: 100%; height: 100%; }
+  canvas { display: block; width: 100%; height: 100%; }
+  /* Shown when WebGL is unavailable: a still pearl in pure CSS that follows the same states. */
+  .fallback { position: absolute; inset: 0; display: none; place-items: center; }
+  .orb {
+    width: min(62%, 200px); aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle at 34% 30%, rgba(255,255,255,.92), rgba(214,240,238,.62) 18%,
+      rgba(127,227,218,.32) 46%, rgba(17,38,58,.55) 72%, rgba(7,11,20,0) 74%);
+    box-shadow: 0 0 70px rgba(127,227,218,.22);
+    transition: filter 600ms cubic-bezier(.22,1,.36,1), transform 600ms cubic-bezier(.22,1,.36,1);
+  }
+  body[data-state="locked"] .orb { filter: saturate(.45) brightness(.7); }
+  body[data-state="refused"] .orb { filter: saturate(.55) brightness(.8); }
+  body[data-state="thinking"] .orb { animation: breathe 1.8s ease-in-out infinite; }
+  @keyframes breathe { 50% { transform: scale(1.04); } }
+  @media (prefers-reduced-motion: reduce) { .orb { animation: none !important; } }
+  body.no-webgl .fallback { display: grid; }
+  body.no-webgl canvas { display: none; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://cdnjs.cloudflare.com/ajax/libs/three.js/0.185.0/three.module.min.js" } }
+</script>
+</head>
+<body data-state="locked">
+<div id="stage"><div class="fallback" aria-hidden="true"><div class="orb"></div></div></div>
+
+<script>
+  // Streamlit component handshake. Plain script, so it works even if three.js cannot load.
+  (function () {
+    var currentHeight = 0;
+    function send(type, data) {
+      var message = Object.assign({ isStreamlitMessage: true, type: type }, data || {});
+      window.parent.postMessage(message, "*");
+    }
+    window.pearlState = "locked";
+    window.onPearlState = null; // set by the scene module once it has started
+    window.addEventListener("message", function (event) {
+      if (!event.data || event.data.type !== "streamlit:render") return;
+      var args = event.data.args || {};
+      var height = args.height || 300;
+      if (height !== currentHeight) {
+        currentHeight = height;
+        send("streamlit:setFrameHeight", { height: height });
+      }
+      var state = args.state || "idle";
+      document.body.dataset.state = state;
+      window.pearlState = state;
+      if (window.onPearlState) window.onPearlState(state);
+    });
+    send("streamlit:componentReady", { apiVersion: 1 });
+  })();
+</script>
+
+<script type="module">
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  // Target look for each state; the scene eases towards it every frame.
+  const LOOKS = {
+    locked:   { exposure: 0.55, ripple: 0.012, speed: 0.25, glow: 0.25, bubbles: 0.22, pull: 0.0, ring: 1, tint: 0x7fe3da },
+    idle:     { exposure: 1.00, ripple: 0.030, speed: 0.60, glow: 0.60, bubbles: 0.55, pull: 0.0, ring: 0, tint: 0x7fe3da },
+    thinking: { exposure: 1.08, ripple: 0.070, speed: 1.60, glow: 1.15, bubbles: 0.85, pull: 0.6, ring: 0, tint: 0x8eeae0 },
+    answered: { exposure: 1.05, ripple: 0.024, speed: 0.50, glow: 0.80, bubbles: 0.60, pull: 0.0, ring: 0, tint: 0x9fe8e1 },
+    refused:  { exposure: 0.72, ripple: 0.018, speed: 0.35, glow: 0.32, bubbles: 0.30, pull: 0.0, ring: 0, tint: 0x8fa3b8 },
+  };
+  const EASE = 2.2;          // how quickly the look follows a state change (per second)
+  const BUBBLE_LAYERS = [    // far, middle, near: smaller and fainter further away
+    { count: 70, size: 0.035, depth: -2.4, opacity: 0.45 },
+    { count: 50, size: 0.06,  depth: -0.6, opacity: 0.7 },
+    { count: 22, size: 0.1,   depth: 1.4,  opacity: 0.9 },
+  ];
+
+  function webglAvailable() {
+    try {
+      const canvas = document.createElement("canvas");
+      return Boolean(canvas.getContext("webgl2") || canvas.getContext("webgl"));
+    } catch (error) {
+      return false;
+    }
+  }
+
+  function softDotTexture(THREE) {
+    const size = 64;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const context = canvas.getContext("2d");
+    const gradient = context.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    gradient.addColorStop(0, "rgba(255,255,255,1)");
+    gradient.addColorStop(0.35, "rgba(214,245,241,0.55)");
+    gradient.addColorStop(1, "rgba(127,227,218,0)");
+    context.fillStyle = gradient;
+    context.fillRect(0, 0, size, size);
+    return new THREE.CanvasTexture(canvas);
+  }
+
+  // A soft studio environment built in code (cdnjs ships no RoomEnvironment add-on).
+  function studioEnvironment(THREE, renderer) {
+    const envScene = new THREE.Scene();
+    const room = new THREE.Mesh(
+      new THREE.SphereGeometry(10, 32, 16),
+      new THREE.MeshBasicMaterial({ color: 0x0b1626, side: THREE.BackSide })
+    );
+    envScene.add(room);
+    const panels = [
+      { color: 0xffffff, size: [6, 3], position: [0, 6, 2], strength: 2.4 },
+      { color: 0x7fe3da, size: [3, 5], position: [-7, 0, 3], strength: 1.6 },
+      { color: 0xf3eee6, size: [4, 4], position: [7, 1, -2], strength: 1.2 },
+    ];
+    for (const panel of panels) {
+      const mesh = new THREE.Mesh(
+        new THREE.PlaneGeometry(...panel.size),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(panel.color).multiplyScalar(panel.strength), side: THREE.DoubleSide })
+      );
+      mesh.position.set(...panel.position);
+      mesh.lookAt(0, 0, 0);
+      envScene.add(mesh);
+    }
+    const pmrem = new THREE.PMREMGenerator(renderer);
+    const texture = pmrem.fromScene(envScene, 0.04).texture;
+    envScene.traverse((object) => {
+      if (object.geometry) object.geometry.dispose();
+      if (object.material) object.material.dispose();
+    });
+    pmrem.dispose();
+    return texture;
+  }
+
+  // Ripple the droplet on the GPU: radial displacement plus a matching normal, so the
+  // surface stays smooth and the light moves across the ripples.
+  function addRipples(material, uniforms) {
+    material.onBeforeCompile = (shader) => {
+      Object.assign(shader.uniforms, uniforms);
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", `#include <common>
+          uniform float uTime; uniform float uRipple;
+          const float F = 2.6;
+          float wave(vec3 p) {
+            return sin(F * p.x + uTime) * sin(F * p.y + 1.3 * uTime) * sin(F * p.z + 0.7 * uTime);
+          }
+          vec3 waveGradient(vec3 p) {
+            float a = F * p.x + uTime, b = F * p.y + 1.3 * uTime, c = F * p.z + 0.7 * uTime;
+            return F * vec3(cos(a) * sin(b) * sin(c), sin(a) * cos(b) * sin(c), sin(a) * sin(b) * cos(c));
+          }`)
+        .replace("#include <beginnormal_vertex>", `#include <beginnormal_vertex>
+          vec3 slope = uRipple * waveGradient(position);
+          objectNormal = normalize(objectNormal - (slope - dot(slope, objectNormal) * objectNormal));`)
+        .replace("#include <begin_vertex>", `#include <begin_vertex>
+          transformed = position * (1.0 + uRipple * wave(position));`);
+    };
+  }
+
+  function makeBubbles(THREE, texture) {
+    return BUBBLE_LAYERS.map((layer) => {
+      const positions = new Float32Array(layer.count * 3);
+      const speeds = new Float32Array(layer.count);
+      for (let i = 0; i < layer.count; i += 1) {
+        positions[i * 3] = (Math.random() - 0.5) * 7;
+        positions[i * 3 + 1] = (Math.random() - 0.5) * 5;
+        positions[i * 3 + 2] = layer.depth + (Math.random() - 0.5);
+        speeds[i] = 0.12 + Math.random() * 0.25;
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const material = new THREE.PointsMaterial({
+        size: layer.size, map: texture, transparent: true, depthWrite: false,
+        blending: THREE.AdditiveBlending, opacity: layer.opacity, color: 0xd6f5f1,
+      });
+      const points = new THREE.Points(geometry, material);
+      points.userData = { speeds, baseOpacity: layer.opacity, home: positions.slice() };
+      return points;
+    });
+  }
+
+  async function start() {
+    if (!webglAvailable()) throw new Error("WebGL is not available");
+    const THREE = await import("three");
+    const stage = document.getElementById("stage");
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "low-power" });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    stage.prepend(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    const environment = studioEnvironment(THREE, renderer);
+    scene.environment = environment;
+    const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 50);
+    camera.position.set(0, 0, 6.2);
+
+    const uniforms = { uTime: { value: 0 }, uRipple: { value: LOOKS.locked.ripple } };
+    const dropletMaterial = new THREE.MeshPhysicalMaterial({
+      color: 0xeafbf8, transmission: 1, thickness: 1.6, roughness: 0.07, ior: 1.33,
+      clearcoat: 1, clearcoatRoughness: 0.05, iridescence: 0.55, iridescenceIOR: 1.35,
+      iridescenceThicknessRange: [180, 520], attenuationColor: new THREE.Color(LOOKS.locked.tint),
+      attenuationDistance: 2.4, envMapIntensity: 1.25,
+    });
+    addRipples(dropletMaterial, uniforms);
+    const droplet = new THREE.Mesh(new THREE.SphereGeometry(1, 160, 120), dropletMaterial);
+    scene.add(droplet);
+
+    const coreMaterial = new THREE.MeshStandardMaterial({ color: 0x0f2a33, emissive: 0x7fe3da, emissiveIntensity: 0.3, roughness: 0.4 });
+    const core = new THREE.Mesh(new THREE.SphereGeometry(0.3, 48, 32), coreMaterial);
+    scene.add(core);
+
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.42, 0.01, 12, 220),
+      new THREE.MeshBasicMaterial({ color: 0x7fe3da, transparent: true, opacity: 0.5 })
+    );
+    ring.rotation.x = Math.PI * 0.42;
+    scene.add(ring);
+
+    const dotTexture = softDotTexture(THREE);
+    const bubbles = makeBubbles(THREE, dotTexture);
+    bubbles.forEach((layer) => scene.add(layer));
+
+    const look = { ...LOOKS.locked };
+    let target = LOOKS[window.pearlState] || LOOKS.idle;
+    let previousState = window.pearlState;
+    let pulse = 0;         // a decaying extra ripple, for the unlock and answer moments
+    const pointer = { x: 0, y: 0 };
+    let running = false;
+    let visible = true;
+    let lastTime = performance.now();
+    let elapsed = 0;
+
+    function resize() {
+      const { width, height } = stage.getBoundingClientRect();
+      if (!width || !height) return;
+      renderer.setSize(width, height, false);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      // Keep the pearl a similar share of the frame on narrow (phone) and wide screens.
+      camera.position.z = width / height < 1.1 ? 7.4 : 6.2;
+    }
+
+    function step(dt) {
+      const k = 1 - Math.exp(-EASE * dt);
+      for (const name of ["exposure", "ripple", "speed", "glow", "bubbles", "pull", "ring"]) {
+        look[name] += (target[name] - look[name]) * k;
+      }
+      pulse *= Math.exp(-2.5 * dt);
+      elapsed += dt * look.speed;
+      uniforms.uTime.value = elapsed * 2.0;
+      uniforms.uRipple.value = look.ripple + pulse * 0.09;
+      renderer.toneMappingExposure = look.exposure;
+      dropletMaterial.attenuationColor.lerp(new THREE.Color(target.tint), k);
+      dropletMaterial.iridescenceThicknessRange[1] = 520 + Math.sin(elapsed * 0.8) * 140 * (target === LOOKS.answered ? 1 : 0.3);
+
+      droplet.position.y = Math.sin(elapsed * 0.9) * 0.06;
+      droplet.rotation.y += dt * 0.12 * look.speed;
+      core.position.copy(droplet.position);
+      coreMaterial.emissiveIntensity = look.glow * (target === LOOKS.thinking ? 0.85 + 0.25 * Math.sin(elapsed * 6) : 1);
+
+      ring.material.opacity = 0.5 * look.ring;
+      ring.scale.setScalar(1 + (1 - look.ring) * 0.35);
+      ring.visible = look.ring > 0.01;
+      ring.rotation.z += dt * 0.15;
+
+      for (const layer of bubbles) {
+        const position = layer.geometry.attributes.position;
+        const { speeds, home } = layer.userData;
+        for (let i = 0; i < speeds.length; i += 1) {
+          let y = position.getY(i) + speeds[i] * dt * (0.4 + look.speed);
+          if (y > 2.6) y = -2.6;
+          const x = position.getX(i);
+          // While thinking, bubbles drift towards the pearl; otherwise back to their lane.
+          const towards = look.pull > 0.01 ? x * (1 - look.pull * dt * 1.5) : x + (home[i * 3] - x) * dt * 0.4;
+          position.setXY(i, towards, y);
+        }
+        position.needsUpdate = true;
+        layer.material.opacity = layer.userData.baseOpacity * look.bubbles;
+      }
+
+      camera.position.x += (pointer.x * 0.5 - camera.position.x) * k;
+      camera.position.y += (pointer.y * 0.35 - camera.position.y) * k;
+      camera.lookAt(0, 0, 0);
+    }
+
+    function frame(now) {
+      if (!running) return;
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      step(dt);
+      renderer.render(scene, camera);
+      requestAnimationFrame(frame);
+    }
+
+    function updateLoop() {
+      const shouldRun = visible && !document.hidden && !reducedMotion.matches;
+      if (shouldRun && !running) {
+        running = true;
+        lastTime = performance.now();
+        requestAnimationFrame(frame);
+      } else if (!shouldRun) {
+        running = false;
+      }
+    }
+
+    function renderStill() {
+      // Reduced motion: jump straight to the state's look and draw one frame.
+      Object.assign(look, target);
+      step(0);
+      renderer.render(scene, camera);
+    }
+
+    window.onPearlState = (state) => {
+      const next = LOOKS[state] || LOOKS.idle;
+      if (previousState === "locked" && state !== "locked") pulse = 1;   // the unlock moment
+      if (state === "answered") pulse = Math.max(pulse, 0.35);
+      previousState = state;
+      target = next;
+      if (reducedMotion.matches) renderStill();
+    };
+
+    window.addEventListener("pointermove", (event) => {
+      pointer.x = event.clientX / window.innerWidth - 0.5;
+      pointer.y = 0.5 - event.clientY / window.innerHeight;
+    });
+    new ResizeObserver(() => { resize(); if (!running) renderStill(); }).observe(stage);
+    new IntersectionObserver((entries) => {
+      visible = entries[0].isIntersecting;
+      updateLoop();
+    }).observe(stage);
+    document.addEventListener("visibilitychange", updateLoop);
+    reducedMotion.addEventListener("change", () => { updateLoop(); renderStill(); });
+
+    window.addEventListener("pagehide", () => {
+      running = false;
+      scene.traverse((object) => {
+        if (object.geometry) object.geometry.dispose();
+        if (object.material) object.material.dispose();
+      });
+      dotTexture.dispose();
+      environment.dispose();
+      renderer.dispose();
+    });
+
+    resize();
+    window.onPearlState(window.pearlState);
+    Object.assign(look, target);
+    renderStill();
+    updateLoop();
+  }
+
+  start().catch(() => document.body.classList.add("no-webgl"));
+</script>
+</body>
+</html>

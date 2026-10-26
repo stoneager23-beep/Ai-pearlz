@@ -26,7 +26,7 @@ The project is built task by task, following the assignment manual. This README 
 | T09 | Conversational memory and follow-ups | Done |
 | T10 | Source attribution | Done |
 | T11 | Evaluation | Done |
-| — | Streamlit app and deployment | Not started |
+| — | Streamlit web app | Done (deploying it is a manual step, below) |
 
 ## Prerequisites
 
@@ -124,6 +124,45 @@ was actually searched. Commands: `/reset` starts a new conversation, `/model gpt
 model, `/verbose` shows what happened behind each answer (retrieved chunks with scores, gate
 decision, tokens, latency), `/quit` leaves. Every turn is logged as one JSON line in
 `logs/supportpearlz.log`.
+
+## The web app
+
+```bash
+streamlit run streamlit_app.py      # then open http://localhost:8501
+```
+
+1. **Key gate.** The first screen asks for your own OpenAI API key, locally and when deployed.
+   The key is checked offline for its format, then with one tiny embedding request. Each failure
+   has its own message: malformed, rejected (401), no credit, rate-limited, timeout, outage. The
+   key is kept in memory for that browser session only. "Change or remove key" in the sidebar
+   forgets it.
+2. **First use on a fresh server.** If no index has been built yet, the app builds it once with
+   the visitor's key and says roughly what that costs (12 documents, 226 chunks, about 24,900
+   tokens of embeddings). Concurrent visitors wait on a file lock instead of building twice.
+3. **Ready screen.** Example questions (each one a case from the evaluation set) and a chat box.
+4. **Answers** stream in as they are written. When complete they show numbered references,
+   source cards with the exact snippet, a confidence chip, tokens and time. "Behind the answer"
+   shows the rewritten question, the gate decision, every retrieved chunk with its score, the
+   model and the prompt version.
+5. **Sidebar.** New conversation, model picker (only models your key can use), filters by
+   document type and product, knowledge-base facts, how it works, your key and the tokens used.
+
+Multi-user safety: `st.cache_resource` holds only the key-free index data. Each visitor's chat
+model and query embeddings are built from the key in their own session and are never cached
+(`tests/test_session_isolation.py` proves two sessions share no client).
+
+### Deploying to Streamlit Community Cloud
+
+1. Push the repository to GitHub. `.env`, `.streamlit/secrets.toml`, `data/vector_store/` and
+   the manual PDF are git-ignored. Check with `git status` that none of them is staged.
+2. On share.streamlit.io choose **Create app**, pick the repository and branch, and set the main
+   file to `streamlit_app.py`.
+3. Under **Advanced settings** choose **Python 3.11**. Leave **Secrets** empty, or paste only
+   the optional settings from `.streamlit/secrets.toml.example`. **Never add an OpenAI key.**
+4. Deploy. The first visitor's validated key builds the index once (about 25,000 embedding
+   tokens). It lasts until the app restarts or is redeployed.
+5. To change the knowledge base, edit `data/knowledge_base/`, commit and push. On the first
+   question after the restart the index is rebuilt, and only changed chunks are embedded again.
 
 ## Evaluation and experiments
 
@@ -247,6 +286,9 @@ src/
   chains/citations.py   citation validation, de-duplication and snippets
   chains/rag_chain.py   the composed LCEL chain
   chains/session.py     one conversation: memory, error handling, per-turn logging
+  chains/streaming.py   streams the answer text out of the model's JSON (web app)
+  llm/key_check.py      validates a pasted key: format, one tiny request, usable models
+  retrieval/shared_index.py  the key-free part of the index that web sessions share
   app_cli.py            `python -m src.app_cli`
   errors.py             every failure to one short, human message
 evaluation/
@@ -255,6 +297,18 @@ evaluation/
   run_eval.py           the evaluation harness; scoring.py is the rubric, judge.py the groundedness judge
   experiments/          runnable experiments (chunking, embeddings, retrievers, threshold, prompts, ...)
   results/              generated reports and experiment tables
+streamlit_app.py        web app entry point (thin; Community Cloud runs it)
+.streamlit/             config.toml (theme, error details off) and secrets.toml.example
+app/
+  main.py               one page run: gate, index, the visitor's session, page
+  state.py              everything kept in st.session_state (the only place the key lives)
+  services.py           the shared key-free index (st.cache_resource) and per-visitor sessions
+  ui/theme.py           design tokens; assets/styles.css is the stylesheet built on them
+  ui/gate.py            the key screen
+  ui/conversation.py    ready screen, past turns, streaming a new answer
+  ui/sidebar.py         controls, filters, knowledge-base facts, key and cost
+  ui/components.py      answer, source cards, confidence chip, "Behind the answer" (all escaped)
+  ui/scene3d.py         the 3D pearl component (assets/pearl_scene/index.html, three.js 0.185.0)
 tests/                  pytest suite (never calls OpenAI)
 docs/CODE_WALKTHROUGH.md  what every file does and why, task by task
 ```

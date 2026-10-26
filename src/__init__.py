@@ -8,3 +8,13 @@ import warnings
 warnings.filterwarnings(
     "ignore", message="`langchain-community` is being sunset", category=DeprecationWarning
 )
+
+# When a structured answer is streamed, langchain-openai serialises the OpenAI SDK's stream
+# chunks, whose `parsed` field is typed None but holds the parsed AnswerDraft. Pydantic then
+# warns on every answer. The values are correct; only this one warning is silenced.
+warnings.filterwarnings(
+    "ignore",
+    message=r"Pydantic serializer warnings:\s+PydanticSerializationUnexpectedValue\(Expected `none`"
+    r"[^\n]*field_name='parsed'",
+    category=UserWarning,
+)

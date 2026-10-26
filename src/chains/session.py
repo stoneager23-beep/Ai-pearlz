@@ -73,6 +73,12 @@ class SupportSession:
         )
         self.chain = build_rag_chain(self.chat_model, retriever, self.settings)
 
+    def set_chat_model(self, chat_model: BaseChatModel) -> None:
+        """Answer with another model from the next turn on, keeping the conversation."""
+        self.chat_model = chat_model
+        self.set_filters(doc_types=self.doc_types, product_line=self.product_line)
+        logger.info("Session %s now answers with %s", self.session_id, self.model_name)
+
     def reset(self) -> None:
         """Forget the conversation (the CLI's /reset and the app's "New conversation")."""
         self.memory.reset()

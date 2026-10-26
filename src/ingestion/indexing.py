@@ -33,7 +33,7 @@ from langchain_core.documents import Document
 
 from src.config import Settings
 from src.ingestion.chunking import build_chunks
-from src.ingestion.embedding_cache import CachedEmbedder
+from src.ingestion.embedding_cache import CachedEmbedder, count_tokens
 from src.ingestion.loaders import FileReport, FileStatus, load_knowledge_base, read_catalog
 from src.retrieval.vector_store import (
     IndexManifest,
@@ -75,6 +75,15 @@ class IndexSyncResult:
     tokens_embedded: int = 0
     seconds: float = 0.0
     skipped_files: list[FileReport] = field(default_factory=list)
+
+
+@dataclass(frozen=True)
+class BuildEstimate:
+    """What a full build would send to the embedding model."""
+
+    documents: int
+    chunks: int
+    tokens: int
 
 
 @dataclass
@@ -251,3 +260,16 @@ def load_or_build(settings: Settings, embedder: CachedEmbedder) -> LoadedIndex:
     sync = None if index_is_current(settings) else sync_index(settings, embedder)
     store, manifest = load_vector_store(embedder.embeddings, settings)
     return LoadedIndex(store=store, manifest=manifest, sync=sync)
+
+
+def estimate_build(settings: Settings) -> BuildEstimate:
+    """Read and chunk the knowledge base locally to count what a full build would embed.
+
+    No API call. It is an upper bound: chunks already in the embedding cache cost nothing.
+    """
+    ingestion = load_knowledge_base(settings.knowledge_base_dir)
+    chunks = build_chunks(ingestion.documents, settings)
+    tokens = sum(
+        count_tokens(chunk.page_content, settings.openai_embedding_model) for chunk in chunks
+    )
+    return BuildEstimate(documents=ingestion.loaded_count, chunks=len(chunks), tokens=tokens)

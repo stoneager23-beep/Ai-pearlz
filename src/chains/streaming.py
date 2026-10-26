@@ -63,7 +63,10 @@ class AnswerTextStream(BaseCallbackHandler):
         if run_id not in self._answer_runs:
             return
         self._json_by_run[run_id] = self._json_by_run.get(run_id, "") + token
-        parsed = parse_partial_json(self._json_by_run[run_id])
+        try:
+            parsed = parse_partial_json(self._json_by_run[run_id])
+        except ValueError:  # nothing parseable yet (the first token is often empty)
+            return
         answer = parsed.get("answer") if isinstance(parsed, dict) else None
         if not isinstance(answer, str):
             return

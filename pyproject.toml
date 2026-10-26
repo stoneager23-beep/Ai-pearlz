@@ -28,6 +28,7 @@ select = [
 allow-star-arg-any = true
 
 [tool.ruff.lint.per-file-ignores]
+"app/ui/icons.py" = ["E501"]  # SVG path data
 # Tests do not need annotations on every fixture and helper.
 "tests/**" = ["ANN"]
 # Command-line entry points print their output for the user.
