@@ -36,6 +36,7 @@ def test_env_file_is_read(tmp_path):
 def test_comma_separated_model_list_is_parsed(monkeypatch):
     monkeypatch.setenv("OPENAI_CHAT_MODELS", " gpt-4o , gpt-4.1-mini,")
     monkeypatch.setenv("OPENAI_CHAT_MODEL", "gpt-4o")
+    monkeypatch.setenv("EVAL_JUDGE_MODEL", "gpt-4o")
 
     settings = load_settings(env_file=None)
 
@@ -63,6 +64,7 @@ def test_unknown_chat_model_is_rejected_with_the_allowed_list(monkeypatch):
 
 def test_default_model_must_be_offered(monkeypatch):
     monkeypatch.setenv("OPENAI_CHAT_MODELS", "gpt-4o")
+    monkeypatch.setenv("EVAL_JUDGE_MODEL", "gpt-4o")
 
     with pytest.raises(ConfigError, match=r"OPENAI_CHAT_MODEL \(gpt-4.1-mini\) must be one of"):
         load_settings(env_file=None)
@@ -147,3 +149,10 @@ def test_smoke_check_reports_invalid_configuration(monkeypatch, capsys, fake_key
 
     assert exit_code == 1
     assert "CHUNK_OVERLAP (5000) must be smaller than CHUNK_SIZE (800)" in capsys.readouterr().err
+
+
+def test_judge_model_must_be_offered(monkeypatch):
+    monkeypatch.setenv("OPENAI_CHAT_MODELS", "gpt-4.1-mini")
+
+    with pytest.raises(ConfigError, match=r"EVAL_JUDGE_MODEL \(gpt-4\.1\) must be one of"):
+        load_settings(env_file=None)

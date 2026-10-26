@@ -135,6 +135,7 @@ class Settings(BaseSettings):
     history_turns: int = Field(default=4, ge=0)
     answer_prompt_version: Literal["v1", "v2"] = "v2"
     condense_prompt_version: Literal["c1", "c2"] = "c2"
+    eval_judge_model: str = "gpt-4.1"
     support_contact: str = Field(
         default="support@pearlzhome.example, toll-free 0800-73275 or WhatsApp +92 300 0732759",
         min_length=1,
@@ -192,6 +193,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"RETRIEVAL_FETCH_K ({self.retrieval_fetch_k}) must be at least "
                 f"RETRIEVAL_K ({self.retrieval_k})"
+            )
+        if self.eval_judge_model not in self.openai_chat_models:
+            raise ValueError(
+                f"EVAL_JUDGE_MODEL ({self.eval_judge_model}) must be one of "
+                f"OPENAI_CHAT_MODELS ({', '.join(self.openai_chat_models)})"
             )
         if self.openai_chat_model not in self.openai_chat_models:
             raise ValueError(
