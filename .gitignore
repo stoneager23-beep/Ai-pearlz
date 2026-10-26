@@ -1,0 +1,26 @@
+# Secrets: never commit
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Generated artefacts: rebuilt by `python -m src.ingestion.build_index`
+data/vector_store/
+logs/
+
+# The instructor's assessment manual is not ours to publish
+docs/SupportPearlz_LangChain_RAG_Assignment_Manual.pdf
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# OS and editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

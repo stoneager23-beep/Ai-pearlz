@@ -1,0 +1,35 @@
+# Tool configuration only. Dependencies live in requirements.in / requirements.txt
+# because Streamlit Community Cloud installs from requirements.txt.
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes: unused imports and variables
+    "I",        # import order
+    "B",        # likely bugs
+    "UP",       # modern syntax for the target Python
+    "SIM",      # simplifications
+    "N",        # naming conventions
+    "ANN",      # type hints on functions
+    "T20",      # no print() outside entry points
+    "ERA",      # no commented-out code
+    "PTH",      # pathlib instead of os.path
+    "C4",       # comprehensions
+    "RET",      # return statements
+    "RUF",      # ruff-specific checks
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Tests do not need annotations on every fixture and helper.
+"tests/**" = ["ANN"]
+# Command-line entry points print their output for the user.
+"src/config.py" = ["T201"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"

@@ -1,0 +1,26 @@
+# Direct runtime dependencies. Edit this file, then regenerate the lock:
+#   uv pip compile requirements.in --universal --python-version 3.11 -o requirements.txt
+
+# Orchestration (loading, splitting, retrieval, prompting, chain composition)
+langchain-core
+langchain-community
+langchain-text-splitters
+langchain-openai
+
+# Vector store
+faiss-cpu
+
+# Settings and the response schema
+pydantic
+pydantic-settings
+python-dotenv
+
+# Document loaders' parsers
+pypdf
+python-docx
+
+# Web interface
+streamlit
+
+# Cross-process lock for the first-use index build on Streamlit Cloud
+filelock

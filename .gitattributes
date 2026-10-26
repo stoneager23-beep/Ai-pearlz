@@ -1,0 +1,6 @@
+# Store text with LF line endings so the repository behaves the same on Windows and on
+# Streamlit Community Cloud (Linux).
+* text=auto eol=lf
+*.pdf binary
+*.docx binary
+*.png binary
