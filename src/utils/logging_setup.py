@@ -60,8 +60,24 @@ class ApiKeyRedactionFilter(logging.Filter):
         return True
 
 
-def configure_logging(settings: Settings) -> None:
+class ConsoleFormatter(logging.Formatter):
+    """One line per record: tracebacks belong in the log file, never in front of a user."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        saved = (record.exc_info, record.exc_text, record.stack_info)
+        record.exc_info, record.exc_text, record.stack_info = None, None, None
+        try:
+            return super().format(record)
+        finally:
+            record.exc_info, record.exc_text, record.stack_info = saved
+
+
+def configure_logging(settings: Settings, console_level: int | None = None) -> None:
     """Install the console and file handlers on the root logger.
+
+    The file gets every record at LOG_LEVEL, with tracebacks. The console gets one line per
+    record, never a traceback; `console_level` can raise its threshold, which the interactive
+    chat does so the conversation is not interleaved with log lines.
 
     Safe to call repeatedly (Streamlit re-runs the script on every interaction): handlers
     installed by an earlier call are replaced, never duplicated.
@@ -78,6 +94,8 @@ def configure_logging(settings: Settings) -> None:
 
     console = logging.StreamHandler(sys.stdout)
     console.set_name(f"{_HANDLER_NAME_PREFIX}-console")
+    if console_level is not None:
+        console.setLevel(console_level)
 
     settings.log_dir.mkdir(parents=True, exist_ok=True)
     log_file = RotatingFileHandler(
@@ -88,8 +106,9 @@ def configure_logging(settings: Settings) -> None:
     )
     log_file.set_name(f"{_HANDLER_NAME_PREFIX}-file")
 
+    console.setFormatter(ConsoleFormatter(_LOG_FORMAT, datefmt=_DATE_FORMAT))
+    log_file.setFormatter(formatter)
     for handler in (console, log_file):
-        handler.setFormatter(formatter)
         handler.addFilter(redaction)
         root.addHandler(handler)
 

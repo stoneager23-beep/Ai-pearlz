@@ -57,10 +57,12 @@ def test_key_never_reaches_stdout_or_file(log_file, capsys, fake_key):
 
     console_output = capsys.readouterr().out
     file_output = log_file.read_text(encoding="utf-8")
-    for output in (console_output, file_output):
-        assert fake_key not in output
-        assert output.count(REDACTED_KEY) == 3
-        assert "RuntimeError" in output
+    assert fake_key not in console_output
+    assert fake_key not in file_output
+    # The console shows the two messages; the file also keeps the (redacted) traceback.
+    assert console_output.count(REDACTED_KEY) == 2
+    assert file_output.count(REDACTED_KEY) == 3
+    assert "RuntimeError" in file_output
 
 
 def test_partly_masked_key_from_openai_errors_is_redacted(log_file, capsys):
@@ -120,3 +122,28 @@ def test_log_lines_are_timestamped(log_file):
     timestamp, level, logger_name, message = line.split(" | ")
     assert len(timestamp) >= len("2026-01-01T00:00:00")
     assert (level.strip(), logger_name, message) == ("INFO", "src.app", "hello")
+
+
+def test_console_never_shows_a_traceback_but_the_file_keeps_it(log_file, capsys):
+    _configure()
+
+    try:
+        raise RuntimeError("connection refused")
+    except RuntimeError:
+        logging.getLogger("src.app").warning("turn failed", exc_info=True)
+    _flush()
+
+    console_output = capsys.readouterr().out
+    assert "turn failed" in console_output
+    assert "Traceback" not in console_output
+    assert "Traceback" in log_file.read_text(encoding="utf-8")
+
+
+def test_console_level_can_be_raised_without_affecting_the_file(log_file, capsys):
+    configure_logging(load_settings(env_file=None), console_level=logging.WARNING)
+
+    logging.getLogger("src.app").info("routine detail")
+    _flush()
+
+    assert "routine detail" not in capsys.readouterr().out
+    assert "routine detail" in log_file.read_text(encoding="utf-8")

@@ -139,7 +139,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         settings = get_settings()
-        configure_logging(settings)
+        # The terminal belongs to the conversation; everything is still in the log file.
+        configure_logging(settings, console_level=logging.WARNING)
         api_key = resolve_cli_api_key(DEFAULT_ENV_FILE, prompt=interactive_prompt())
         session = _start_session(args, settings, api_key)
     except (ConfigError, ApiKeyError) as error:
