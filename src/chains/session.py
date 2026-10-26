@@ -24,7 +24,9 @@ from src.chains.rag_chain import build_rag_chain
 from src.chains.schemas import Confidence, RefusalReason, SupportResponse, TokenUsage
 from src.config import Settings
 from src.errors import describe_failure, log_detail
+from src.llm.clients import build_chat_model, build_embeddings
 from src.retrieval.retriever import build_retriever
+from src.retrieval.shared_index import SharedIndex
 
 MILLISECONDS = 1000
 SESSION_ID_LENGTH = 8
@@ -154,4 +156,27 @@ def _sum_usage(handler: UsageMetadataCallbackHandler) -> TokenUsage:
     return TokenUsage(
         input_tokens=sum(item.get("input_tokens", 0) for item in usage),
         output_tokens=sum(item.get("output_tokens", 0) for item in usage),
+    )
+
+
+def build_user_session(
+    settings: Settings,
+    shared_index: SharedIndex,
+    api_key: str,
+    model_name: str | None = None,
+    *,
+    streaming: bool = False,
+    doc_types: tuple[str, ...] = (),
+    product_line: str | None = None,
+) -> SupportSession:
+    """A session for one person: their key, their clients, their memory.
+
+    Everything that holds the key (the embeddings that embed this person's questions and the
+    chat model) is created here, for this session only. The only thing shared with other
+    sessions is `shared_index`, which holds no key.
+    """
+    store = shared_index.store_for(build_embeddings(api_key, settings))
+    chat_model = build_chat_model(api_key, settings, model_name, streaming=streaming)
+    return SupportSession(
+        settings, store, chat_model, doc_types=doc_types, product_line=product_line
     )
