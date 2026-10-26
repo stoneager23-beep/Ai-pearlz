@@ -130,6 +130,15 @@ class Settings(BaseSettings):
     retrieval_fetch_k: int = Field(default=20, ge=1)
     retrieval_mmr_lambda: float = Field(default=0.5, ge=0.0, le=1.0)
     relevance_threshold: float = Field(default=0.34, ge=0.0, le=1.0)
+    confidence_high_score: float = Field(default=0.50, ge=0.0, le=1.0)
+    max_context_characters: int = Field(default=8000, gt=0)
+    history_turns: int = Field(default=4, ge=0)
+    answer_prompt_version: Literal["v1", "v2"] = "v2"
+    condense_prompt_version: Literal["c1", "c2"] = "c2"
+    support_contact: str = Field(
+        default="support@pearlzhome.example, toll-free 0800-73275 or WhatsApp +92 300 0732759",
+        min_length=1,
+    )
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_dir: Path = Path("logs")
