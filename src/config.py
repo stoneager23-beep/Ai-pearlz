@@ -66,6 +66,27 @@ CHAT_MODEL_CATALOGUE: tuple[ChatModelOption, ...] = (
 _CATALOGUE_BY_NAME = {option.name: option for option in CHAT_MODEL_CATALOGUE}
 
 
+class EmbeddingModelSpec(BaseModel):
+    """What the index must know about an embedding model: its vector size and input limit."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    dimension: int
+    max_input_tokens: int
+
+
+# From developers.openai.com/api/docs/guides/embeddings (checked 2026-10-26). LangChain's
+# OpenAIEmbeddings splits any text longer than 8,191 tokens and averages the pieces, so chunks
+# are checked against that stricter figure (EMBEDDING_SPLIT_LIMIT_TOKENS) before embedding.
+EMBEDDING_MODEL_CATALOGUE: tuple[EmbeddingModelSpec, ...] = (
+    EmbeddingModelSpec(name="text-embedding-3-small", dimension=1536, max_input_tokens=8192),
+    EmbeddingModelSpec(name="text-embedding-3-large", dimension=3072, max_input_tokens=8192),
+)
+EMBEDDING_SPLIT_LIMIT_TOKENS = 8191
+_EMBEDDING_SPECS_BY_NAME = {spec.name: spec for spec in EMBEDDING_MODEL_CATALOGUE}
+
+
 class ConfigError(Exception):
     """Raised when configuration is invalid. The message is written for a person to read."""
 
@@ -91,14 +112,19 @@ class Settings(BaseSettings):
     )
     openai_embedding_model: str = Field(default="text-embedding-3-small", min_length=1)
     llm_temperature: float = Field(default=0.0, ge=0.0, le=MAX_TEMPERATURE)
+    openai_timeout_seconds: float = Field(default=30.0, gt=0)
+    openai_max_retries: int = Field(default=4, ge=0)
+    embedding_batch_size: int = Field(default=64, ge=1)
 
     knowledge_base_dir: Path = Path("data/knowledge_base")
     vector_store_dir: Path = Path("data/vector_store")
     collection_name: str = Field(default="pearlz_kb", pattern=r"^[A-Za-z0-9_-]+$")
+    embedding_cache_path: Path = Path("data/embedding_cache/embeddings.sqlite3")
     results_dir: Path = Path("evaluation/results")
 
-    chunk_size: int = Field(default=800, gt=0)
-    chunk_overlap: int = Field(default=120, ge=0)
+    chunk_size: int = Field(default=1500, gt=0)
+    chunk_overlap: int = Field(default=225, ge=0)
+    chunk_context_headers: bool = True
     retrieval_k: int = Field(default=4, ge=1)
     relevance_threshold: float = Field(default=0.30, ge=0.0, le=1.0)
 
@@ -128,7 +154,17 @@ class Settings(BaseSettings):
     def _upper_case_level(cls, value: object) -> object:
         return value.upper() if isinstance(value, str) else value
 
-    @field_validator("knowledge_base_dir", "vector_store_dir", "results_dir", "log_dir")
+    @field_validator("openai_embedding_model")
+    @classmethod
+    def _embedding_model_must_be_known(cls, name: str) -> str:
+        if name not in _EMBEDDING_SPECS_BY_NAME:
+            known = ", ".join(_EMBEDDING_SPECS_BY_NAME)
+            raise ValueError(f"unknown embedding model {name}; choose from: {known}")
+        return name
+
+    @field_validator(
+        "knowledge_base_dir", "vector_store_dir", "embedding_cache_path", "results_dir", "log_dir"
+    )
     @classmethod
     def _resolve_from_project_root(cls, path: Path) -> Path:
         return path if path.is_absolute() else PROJECT_ROOT / path
@@ -150,6 +186,11 @@ class Settings(BaseSettings):
     def chat_model_options(self) -> tuple[ChatModelOption, ...]:
         """The catalogue entries for the models users may pick, in configured order."""
         return tuple(_CATALOGUE_BY_NAME[name] for name in self.openai_chat_models)
+
+    @property
+    def embedding_spec(self) -> EmbeddingModelSpec:
+        """Dimension and input limit of the configured embedding model."""
+        return _EMBEDDING_SPECS_BY_NAME[self.openai_embedding_model]
 
 
 def load_settings(env_file: Path | None = DEFAULT_ENV_FILE) -> Settings:

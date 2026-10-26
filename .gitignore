@@ -6,6 +6,7 @@
 
 # Generated artefacts: rebuilt by `python -m src.ingestion.build_index`
 data/vector_store/
+data/embedding_cache/
 logs/
 
 # The instructor's assessment manual is not ours to publish

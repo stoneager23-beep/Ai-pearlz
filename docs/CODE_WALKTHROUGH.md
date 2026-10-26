@@ -338,3 +338,191 @@ The full per-file table is in `evaluation/results/ingestion_report.md`. `pytest`
   instruction-like text. We deliberately do not strip the planted line, so we can show that the
   prompt-level defence holds. In production we would flag such lines for human review at
   ingestion."
+
+---
+
+## T03: Chunking strategy
+
+### What the manual asks for
+
+A recursive character splitter as the baseline; at least three sizes and two overlaps; at least
+one structure-aware alternative; for each configuration the chunk count, mean and maximum
+length and hit@4 on five sample questions; proof that metadata survives splitting; and a
+justification that uses our own numbers.
+
+### Files
+
+| File | What it does |
+|---|---|
+| `src/ingestion/chunking.py` | `split_into_chunks` (RecursiveCharacterTextSplitter inside each structural unit, stable chunk ids such as `warranty_policy.md::0007`), `add_context_headers`, `build_chunks` (the production recipe from settings), `assert_within_embedding_limit`, `chunk_statistics`. |
+| `evaluation/retrieval_questions.json` | 10 retrieval questions with accepted source documents and answer patterns. R01-R05 are the five chunking samples. Written before any tuning. |
+| `evaluation/retrieval_checks.py` | `contains_answer` (right source and every pattern matches) and `first_hit_rank`. No LLM involved. |
+| `evaluation/experiments/chunking.py` | `python -m evaluation.experiments.chunking`: runs 12 configurations and writes `evaluation/results/chunking_experiment.md`. |
+| `evaluation/experiments/common.py` | Shared setup for experiment scripts: settings, logging, API key, result files, Markdown tables. |
+| `tests/test_chunking.py` | 10 tests: metadata survives splitting, ids unique and stable, overlap shared, short units kept whole, context headers, over-long chunks refused, production chunks of the real knowledge base. |
+
+### The experiment (real run, 2026-10-26)
+
+Twelve configurations, each embedded with `text-embedding-3-small` and searched by cosine
+similarity, top 4. "Sample" is the manual's five questions; MRR is the mean of 1/rank of the
+first chunk containing the answer over all ten questions (0 when it is not in the top 4).
+
+| Strategy | Size / overlap | Chunks | Mean chars | hit@4 sample | hit@4 all 10 | MRR |
+|---|---|---|---|---|---|---|
+| format-blind | 300 / 0 | 397 | 220 | 5/5 | 8/10 | 0.51 |
+| format-blind | 300 / 45 | 409 | 224 | 5/5 | 8/10 | 0.58 |
+| format-blind | 800 / 0 | 130 | 676 | 4/5 | 8/10 | 0.62 |
+| format-blind | 800 / 120 | 138 | 684 | 4/5 | 8/10 | 0.61 |
+| format-blind | 1500 / 0 | 70 | 1256 | 4/5 | 8/10 | 0.50 |
+| format-blind | 1500 / 225 | 76 | 1274 | 5/5 | 9/10 | 0.68 |
+| structure-aware | 300 / 45 | 435 | 204 | 4/5 | 7/10 | 0.53 |
+| structure-aware | 800 / 120 | 246 | 357 | 4/5 | 7/10 | 0.65 |
+| structure-aware | 1500 / 225 | 226 | 387 | 5/5 | 8/10 | 0.68 |
+| structure-aware + header | 300 / 45 | 435 | 263 | 4/5 | 8/10 | 0.61 |
+| structure-aware + header | 800 / 120 | 246 | 416 | 5/5 | 9/10 | 0.68 |
+| **structure-aware + header** | **1500 / 225** | **226** | **446** | **5/5** | **9/10** | **0.72** |
+
+**Adopted:** structure-aware splitting with context headers, `CHUNK_SIZE=1500`,
+`CHUNK_OVERLAP=225` (15%), `CHUNK_CONTEXT_HEADERS=true`.
+
+### Why this configuration (the justification, with our numbers)
+
+- **It ties for the best hit@4** (5/5 on the samples, 9/10 overall) and has **the best MRR,
+  0.72**, so the answer is usually the first chunk, not just somewhere in the top 4.
+- **The format-blind 1500/225 baseline also reaches 9/10**, but its chunks have no page or
+  section; they span several sections of a file, so a citation could only say "somewhere in
+  the manual". Structure-aware chunks carry `page_number` and `section` for Task 10.
+- **The size limit only matters for long sections.** Structure-aware chunks average 387-446
+  characters because most sections are short; 1500 decides how long tables (the
+  troubleshooting symptoms, the alert codes) are cut.
+- **The trade-off, seen in our data.** Small chunks are precise but strip context: at
+  structure-aware 300 the cleaning question (R04) was missed, because the cleaning-schedule
+  table was cut away from the heading that says what it is. Large format-blind chunks keep
+  context by merging sections: format-blind 1500 is the only setting that found the privacy
+  telemetry chunk (R08, rank 2), because that chunk merged the whole "data collected through
+  the app" part. But merged chunks average everything they contain into one vector and cannot
+  be cited precisely.
+- **Overlap.** At 300 characters, overlap 45 raised MRR from 0.51 to 0.58 (R02 moved from rank
+  3 to 1: the alert-code row had been cut at a boundary). At 1500, overlap 225 found R05, which
+  0% missed. At 800 it made no difference. 15% is the setting that never hurt.
+
+### How the context header was found (debugging discipline)
+
+The first run, without headers, missed R05, R08 and R10 at structure-aware 1500. Following the
+manual's order (check retrieval before touching prompts), the top-6 chunks were inspected:
+
+- **R05** was actually found, at ranks 3 and 4. The troubleshooting symptoms table outranks
+  the installation guide, which is the seam working as designed.
+- **R08** missed because the DOCX section "3.2 Water-usage and device telemetry" loses its
+  parent heading "3. Data we collect through the Pearlz Home app", so the chunk never says
+  "app".
+- **R10** (E-06) missed because the old E-06 rows in the manual and troubleshooting guide
+  outrank the changelog: retrieval prefers the outdated meaning.
+
+The hypothesis was that a "Document > section path" header line would fix R08. **Measured
+result: it did not fix R08** (still outside the top 4), **but it fixed R10** (changelog now
+rank 2) and raised MRR from 0.68 to 0.72. R08 stays a known retrieval miss, revisited with
+larger k and MMR in Task 06. This is reported as found, not as hoped.
+
+### Design decisions and why
+
+1. **Split inside structural units, never across them.** A chunk never mixes the end of one
+   section with the start of the next, so its embedding is about one thing and its citation
+   names one place.
+2. **Readable chunk ids** (`source::0007`) appear in logs and the "Behind the answer" panel, so
+   a retrieval trace reads like a list of places.
+3. **Headers are added after splitting**, so every piece of a long section, not only the first,
+   knows which section it belongs to. The header is also stored in `metadata["context_header"]`
+   so citation snippets can leave it out.
+4. **Pricing rows stay whole.** At the production size every row is one chunk; the test
+   `test_production_chunks_of_the_real_knowledge_base_keep_their_metadata` checks there is
+   exactly one chunk per SKU, so a price is never split from its product (manual mistake #13).
+
+### Viva questions this prepares
+
+- **Q1: Why chunk at all?** "Whole documents do not fit the context budget, and one vector for
+  an 18-page manual averages every topic into a point that is close to nothing in particular.
+  Our format-blind runs show the milder version of this: at 1500 characters with 0% overlap,
+  MRR fell to 0.50. Chunks also make citations possible: page 16, section 13."
+- **Q5: What is overlap for, and what goes wrong at 0% and at 60%?** "At 0% an answer that
+  straddles a boundary is cut in two. At 300 characters, 15% overlap moved the E-03 row from
+  rank 3 to rank 1. At 60% the index grows by more than half again and near-duplicate chunks
+  crowd the top 4, so fewer distinct passages reach the model. We use 15%."
+- **Q7 (k) and Q11 (retrieval without the LLM)** start here: every number above comes from
+  retrieval alone, scored against answer patterns written before tuning.
+
+---
+
+## T04: Embeddings
+
+### What the manual asks for
+
+Choose an embedding model and record its name, dimension and input limit; check chunk size
+against that limit; embed in batches with retry and backoff; log time and tokens; make runs
+resumable or cached; run a three-sentence similarity diagnostic; and explain the vector,
+cosine similarity, and what breaks if documents and queries use different models.
+
+### Files
+
+| File | What it does |
+|---|---|
+| `src/llm/clients.py` | `build_embeddings(api_key, settings)` and `build_chat_model(...)`: the only place OpenAI objects are created, always from an explicit key (never from the environment), never cached. |
+| `src/ingestion/embedding_cache.py` | `build_cached_embedder`: LangChain's `CacheBackedEmbeddings` over `SQLiteByteStore` (one SQLite file), wrapping `TokenCountingEmbeddings`, which logs every batch with its size, tokens and time. |
+| `src/retrieval/vector_store.py` | `create_vector_store` (FAISS, inner product) and `assert_unit_length`. |
+| `evaluation/experiments/embedding_diagnostic.py` | `python -m evaluation.experiments.embedding_diagnostic`: writes `evaluation/results/embedding_diagnostic.md`. |
+| `tests/test_embedding_cache.py` | 5 tests with a fake model: store round trip, no text embedded twice, **a crash mid-run keeps finished batches**, another model never reuses vectors, token counting. |
+
+### Measured (real run, 2026-10-26)
+
+| Property | Value |
+|---|---|
+| Model | `text-embedding-3-small` |
+| Dimension | 1536 (measured and documented) |
+| Vector length | 0.9998 to 1.0002 (unit length, measured) |
+| Maximum input | 8,192 tokens documented; LangChain splits above 8,191 |
+| Longest production chunk | 446 tokens (1,551 characters including its header) |
+| Paraphrases, customer vs manual wording | cosine **0.627** |
+| Each paraphrase vs an unrelated sentence | **0.054** and **0.024** |
+| "Alert E-03 is shown" vs "Alert E-08 is shown" | **0.869** |
+| Embedding cost of both chunking runs | 1,970 texts, 196,152 tokens, about US$0.004 at $0.02 per million tokens |
+
+### Design decisions and why
+
+1. **Cache first, then OpenAI, one batch at a time.** `CacheBackedEmbeddings` looks every text
+   up by `sha256(text)` under the model's name and sends only the misses, in batches of
+   `EMBEDDING_BATCH_SIZE` (64). Each batch is stored before the next starts. The test
+   `test_a_crash_mid_run_keeps_the_finished_batches` makes the third call fail; on the rerun
+   only the 2 remaining texts are embedded.
+2. **One SQLite file, not one file per vector.** LangChain's `LocalFileStore` would write about
+   2,000 small files, all of which OneDrive would try to sync. `SQLiteByteStore` is a 40-line
+   LangChain `ByteStore`.
+3. **Retry and backoff come from the OpenAI client** (`OPENAI_MAX_RETRIES=4`, exponential backoff
+   on timeouts, 429s and 5xx), configured in `build_embeddings`.
+4. **The cache key includes the model name**, so switching `OPENAI_EMBEDDING_MODEL` can never
+   mix vectors from two models (tested).
+5. **Chunks are checked against the input limit before embedding.** `OpenAIEmbeddings` would
+   silently split an over-long text and average the pieces; `assert_within_embedding_limit`
+   refuses such a chunk instead (manual mistake #11). Ours peak at 446 tokens.
+6. **Inner product equals cosine here.** The vectors are unit length (measured), and for unit
+   vectors the inner product is the cosine. The first version also passed `normalize_L2=True`;
+   LangChain warned that this "is not applicable" to inner product (it still normalised). The
+   flag was removed, and `assert_unit_length` now verifies the property on the built index.
+7. **Keys stay out of shared objects.** `build_embeddings` requires the key as an argument and
+   is called per session; the cache holds only hashes and vectors, so it is safe to share.
+
+### Viva questions this prepares
+
+- **Q2: What does an embedding represent?** "A position in a 1536-dimensional space learned
+  from how text is used, where closeness means similar meaning; the individual dimensions are
+  not human-readable features. 'My purifier keeps beeping three times' and 'the unit sounds a
+  triple short tone' share almost no words, yet score 0.627, against 0.054 for an unrelated
+  sentence."
+- **Why cosine, not Euclidean?** "Cosine compares direction and ignores length, and direction is
+  what carries meaning. Our vectors are unit length, so cosine, inner product and Euclidean
+  distance give the same ranking. We use inner product, which for unit vectors is the cosine."
+- **Q4: Different models for documents and queries.** "Each model has its own space; even
+  with equal dimensions the axes mean different things. Retrieval would turn near-random with
+  no error at all. That is why our cache keys and (Task 05) the index manifest record the model
+  name, and loading refuses a mismatch."
+- **Q3 (again):** "E-03 against E-08 scores 0.869 although they mean different things: exact
+  codes are where keyword search wins."

@@ -1,0 +1,75 @@
+{
+  "description": "Retrieval-only ground truth for the chunking (Task 03) and retriever (Task 06) experiments. A retrieved chunk 'contains the answer' when it comes from one of accepted_sources and matches every regex in answer_patterns (case-insensitive). The first five questions are the five sample questions of the chunking experiment. Written before any tuning and not changed afterwards.",
+  "questions": [
+    {
+      "id": "R01",
+      "question": "How long is the warranty on the AquaPearl 500 Pro?",
+      "accepted_sources": ["warranty_policy.md", "product_manual_aquapearl500.pdf", "faq.md"],
+      "answer_patterns": ["AquaPearl 500 Pro", "24 months"],
+      "chunking_sample": true
+    },
+    {
+      "id": "R02",
+      "question": "My purifier beeps three times and the light flashes red. What should I do?",
+      "accepted_sources": ["troubleshooting_guide.md", "product_manual_aquapearl500.pdf"],
+      "answer_patterns": ["E-03", "RESET"],
+      "chunking_sample": true
+    },
+    {
+      "id": "R03",
+      "question": "How much does a replacement sediment filter cost?",
+      "accepted_sources": ["pricing_guide.csv"],
+      "answer_patterns": ["F5-PF1", "2,?400"],
+      "chunking_sample": true
+    },
+    {
+      "id": "R04",
+      "question": "How do I clean the unit?",
+      "accepted_sources": ["product_manual_aquapearl500.pdf"],
+      "answer_patterns": ["descal", "3 months"],
+      "chunking_sample": true
+    },
+    {
+      "id": "R05",
+      "question": "Water tastes weird after I changed the filter.",
+      "accepted_sources": ["installation_guide_aquapearl.pdf"],
+      "answer_patterns": ["flush", "taste"],
+      "chunking_sample": true
+    },
+    {
+      "id": "R06",
+      "question": "What's the return window?",
+      "accepted_sources": ["refund_returns_policy.md", "faq.md"],
+      "answer_patterns": ["14 days", "delivery"],
+      "chunking_sample": false
+    },
+    {
+      "id": "R07",
+      "question": "How long does delivery take to Skardu?",
+      "accepted_sources": ["shipping_policy.md", "faq.md"],
+      "answer_patterns": ["Skardu", "5 to 7"],
+      "chunking_sample": false
+    },
+    {
+      "id": "R08",
+      "question": "What's your privacy policy on app data?",
+      "accepted_sources": ["privacy_policy.docx"],
+      "answer_patterns": ["every 15 minutes"],
+      "chunking_sample": false
+    },
+    {
+      "id": "R09",
+      "question": "My unit leaked. How do I make a warranty claim and how long does it take?",
+      "accepted_sources": ["service_maintenance_agreement.docx"],
+      "answer_patterns": ["inspect", "working days"],
+      "chunking_sample": false
+    },
+    {
+      "id": "R10",
+      "question": "What does error E-06 mean on my AquaPearl?",
+      "accepted_sources": ["firmware_changelog_aquapearl500.txt"],
+      "answer_patterns": ["E-06", "UV-LED"],
+      "chunking_sample": false
+    }
+  ]
+}

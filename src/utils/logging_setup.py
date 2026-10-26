@@ -23,7 +23,7 @@ _MAX_LOG_FILE_BYTES = 5 * 1024 * 1024
 _LOG_FILE_BACKUPS = 3
 _HANDLER_NAME_PREFIX = "supportpearlz"
 # Libraries that log one line per HTTP request at INFO. Their warnings still come through.
-_CHATTY_LIBRARIES = ("httpx", "httpcore", "openai", "urllib3", "faiss")
+_CHATTY_LIBRARIES = ("httpx", "httpx2", "httpcore", "openai", "urllib3", "faiss")
 # pypdf warns about every harmless quirk in a readable PDF. A file it cannot read is reported
 # by the loader as one clear warning naming the file, so only pypdf's errors are kept.
 _PDF_LIBRARY = "pypdf"

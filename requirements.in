@@ -6,9 +6,14 @@ langchain-core
 langchain-community
 langchain-text-splitters
 langchain-openai
+# CacheBackedEmbeddings (embedding cache)
+langchain-classic
 
 # Vector store
 faiss-cpu
+
+# Token counting for embedding cost and chunk-length checks
+tiktoken
 
 # Settings and the response schema
 pydantic

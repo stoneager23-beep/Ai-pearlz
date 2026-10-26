@@ -29,6 +29,7 @@ select = [
 # Command-line entry points print their output for the user.
 "src/config.py" = ["T201"]
 "src/ingestion/report.py" = ["T201"]
+"evaluation/**" = ["T201"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

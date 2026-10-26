@@ -144,6 +144,7 @@ jsonschema-specifications==2025.9.1
 langchain-classic==1.0.8
     # via
     #   -c requirements.txt
+    #   -r requirements.in
     #   langchain-community
 langchain-community==0.4.2
     # via
@@ -364,6 +365,7 @@ tenacity==9.2.1
 tiktoken==0.14.0
     # via
     #   -c requirements.txt
+    #   -r requirements.in
     #   langchain-openai
 truststore==0.10.5 ; sys_platform != 'emscripten'
     # via

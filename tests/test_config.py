@@ -140,6 +140,7 @@ def test_smoke_check_without_key_gives_one_clear_error(capsys):
 
 def test_smoke_check_reports_invalid_configuration(monkeypatch, capsys, fake_key):
     monkeypatch.setenv("OPENAI_API_KEY", fake_key)
+    monkeypatch.setenv("CHUNK_SIZE", "800")
     monkeypatch.setenv("CHUNK_OVERLAP", "5000")
 
     exit_code = main(env_file=Path("does-not-exist.env"))
