@@ -158,3 +158,183 @@ SupportPearlz configuration
 ```
 
 `ruff check`: all checks passed. `pytest`: 45 passed.
+
+---
+
+## Dataset: the Pearlz knowledge base (manual Sec 5)
+
+### What the manual asks for
+
+At least 10 fictional, internally consistent documents (about 9,000-12,000 words, 18-20 pages
+or more) in at least three formats, with at least three planted seams, three planted gaps, a
+prompt-injection line, and a firmware changelog that changes the meaning of an alert code.
+
+### What was built
+
+| File | Format | Size | Role |
+|---|---|---|---|
+| `product_manual_aquapearl500.pdf` | PDF | 18 pages | Box contents, specs, controls, lights, filters, cleaning, alert codes E-01 to E-08 |
+| `installation_guide_aquapearl.pdf` | PDF | 7 pages | Pre-install checklist, mounting, **first-run flushing** (seam S2), **what voids the warranty** (seam S3) |
+| `service_maintenance_agreement.docx` | DOCX | 10 sections | Maintenance plans, response times, **warranty claim procedure** (seam S1), out-of-warranty charges |
+| `privacy_policy.docx` | DOCX | 11 sections | Data collected, app telemetry, retention, sharing, rights |
+| `warranty_policy.md` | Markdown | 9 sections | Periods, coverage, §3.2 exclusions, discontinued models |
+| `refund_returns_policy.md` | Markdown | 9 sections | 14-day window, condition rules, refund times, bundles |
+| `shipping_policy.md` | Markdown | 9 sections | Region tiers, cut-offs, fees, next-day cities |
+| `troubleshooting_guide.md` | Markdown | 24 symptoms | Symptom tables, "Audible Alert Codes", escalation rules |
+| `faq.md` | Markdown | 34 questions | Questions in customer language |
+| `customer_service_handbook.md` | Markdown | 8 sections | Internal process; §7 holds the **planted injection line** |
+| `firmware_changelog_aquapearl500.txt` | Plain text | 6 versions | 2.4.0 changes the meaning of **E-06** (version conflict) |
+| `pricing_guide.csv` | CSV | 25 rows | Every SKU with list and promotional price |
+
+About 15,000 words in 5 formats. `data/knowledge_base/_PLANTED_SEAMS_AND_GAPS.md` is the answer
+key: 6 seams, 6 gaps, the injection line, the ambiguities, and a table of canonical facts.
+
+| Supporting file | What it does |
+|---|---|
+| `data/kb_sources/*.md` | Editable Markdown sources of the two PDFs and the two DOCX files. Never ingested. |
+| `scripts/render_kb_documents.py` | Renders those sources to PDF (A5 pages, running header and footer, page numbers) and DOCX (real Word heading styles). |
+| `data/knowledge_base/_catalog.json` | Document-level metadata for every file: title, `doc_type`, `product_lines`, `version`, `last_updated`. |
+
+### Design decisions and why
+
+1. **Sources are Markdown; the published files are generated.** Editing a PDF by hand is
+   impractical, and the documents are meant to be reviewed and changed. Edit the source, run
+   `python -m scripts.render_kb_documents`, and the PDF or DOCX is rebuilt.
+2. **The PDFs look like real publications.** Every page has a running header and a footer with
+   a page number, which ingestion must detect and strip (Task 02). The manual has page-level
+   structure, so citations can say "p. 16".
+3. **Unicode fonts in the PDFs.** reportlab's built-in Helvetica has no Unicode map, so text
+   extraction turned "38 °C" into "38 ?C" and list bullets into a control character. The
+   renderer uses the TrueType fonts bundled with reportlab, and extraction is now clean.
+4. **Reproducible PDFs.** `rl_config.invariant = 1` fixes timestamps and IDs, so re-rendering an
+   unchanged source gives a byte-identical PDF (verified). The index later uses file hashes to
+   decide what changed, so spurious changes would mean spurious re-embedding.
+5. **Alert codes use technical vocabulary.** The documents say "triple short tone; FILTER
+   indicator pulses red", never "beeps three times". The headline semantic test (T-05) asks
+   "my purifier beeps three times and the light flashes red", so it can only succeed by meaning,
+   not by shared keywords. An earlier draft did use "beeps three times", which would have made
+   the test meaningless; it was caught and rewritten.
+6. **An independent consistency review.** A second reviewer checked all 12 documents against
+   the canonical-facts table and found 12 issues, all fixed. Examples: two different
+   technician response times for the same warranty claim; a cancellation rule that could never
+   apply; the FAQ answering a seam question; the manual repeating flush steps that should live
+   only in the installation guide; three different escalation points for E-05; and a privacy
+   sentence ("products not intended for children") that nearly answered the baby-formula gap.
+7. **Fictional names.** Pearlz, AeroPearl, Kestrel Couriers, Lumina Payments and NimbusCloud are
+   invented. "AquaPearl" comes from the assignment brief; a similarly named real brand exists
+   in India, so the README states that the company is fictional. Emails use the reserved
+   `.example` domain; phone numbers and the address are placeholders.
+
+### Viva questions this prepares
+
+- **Q3: Where is semantic search worse than keyword search, in your own KB?** "Our alert codes.
+  E-03 is a saturated pre-filter and E-08 is a display fault, but as embeddings 'E-03' and
+  'E-08' are nearly identical tokens in nearly identical table rows. Keyword search matches the
+  exact code; semantic search can mix them up. The reverse is T-05: 'beeps three times' shares
+  no words with 'triple short tone', and only semantic search finds it."
+- **Q19: An injected instruction inside a document.** "We planted one on purpose, in
+  `customer_service_handbook.md` §7, right next to the compensation limits, because that is
+  what refund questions retrieve. It stays in the index so we can prove the prompt-level
+  defence works (Task 08)."
+- **Q20: The refund policy changes.** "Every document has `version` and `last_updated` in
+  `_catalog.json`, and those travel to every chunk. Task 05 shows what the index does with a
+  changed file."
+
+---
+
+## T02: Document ingestion
+
+### What the manual asks for
+
+Walk the folder and dispatch each file to a loader by extension (PDF, DOCX or Markdown, text,
+CSV); normalise text; strip page headers and footers; attach the metadata contract; keep
+loader metadata such as page numbers; skip bad files without stopping; skip duplicates; and
+report per file: name, type, characters, pages or sections, and metadata keys.
+
+Acceptance: a folder with one corrupt file loads everything else, logs one warning naming the
+bad file, and exits successfully. Every document has a non-empty `source` and `doc_type`.
+
+### Files
+
+| File | What it does |
+|---|---|
+| `src/ingestion/loaders.py` | `load_knowledge_base(kb_dir)`: the extension-to-loader table `LOADERS`, one loader function per format, the metadata contract, and per-file error handling. Returns an `IngestionResult` (the documents plus one `FileReport` per file). |
+| `src/ingestion/text_cleaning.py` | Whitespace and control-character cleanup, running header and footer detection, and splitting text at numbered or capitalised headings. |
+| `src/ingestion/report.py` | `python -m src.ingestion.report [--kb-dir PATH]` prints the ingestion report and writes `evaluation/results/ingestion_report.md`. |
+| `tests/test_loaders.py` | 17 tests: dispatch, the metadata contract, page metadata kept, header and footer stripping, each format's sections, CSV sentences, and corrupt, encrypted, unsupported, uncatalogued, duplicate, underscore and sub-folder files, plus the real knowledge base. |
+| `tests/test_text_cleaning.py` | 11 tests for the cleaning and section-splitting rules. |
+| `tests/kb_builders.py` | Writes a small PDF, DOCX, Markdown, text and CSV knowledge base for the tests. |
+
+### Design decisions and why
+
+1. **One Document per structural unit, not per file.** A PDF becomes one Document per section
+   on each page; DOCX, Markdown and text files one per heading section; a CSV one per row. So
+   every unit already knows its location (`page_number` and `section`, `section`, or `row` and
+   `sku`), which is exactly what citations need in Task 10. Chunking (Task 03) splits within
+   these units, so a chunk never straddles two sections.
+2. **Metadata comes from `_catalog.json`, not from guessing.** `doc_type`, `product_lines`,
+   `version` and `last_updated` are written once per file and validated with Pydantic
+   (`CatalogEntry`). A file without an entry is skipped with that reason, because a document
+   without metadata cannot be filtered or cited properly. `product_lines` is a list because the
+   installation and troubleshooting guides cover several product lines.
+3. **Loader metadata is kept, not overwritten.** PyPDFLoader's `page` (counted from 0) stays as
+   it is, and `page_number` (counted from 1, for people) is added beside it. The loader's full
+   path moves to `file_path`, and `source` becomes the file name the contract asks for.
+4. **Running headers and footers are detected, not hard-coded.** A line counts as a running
+   line if, ignoring digits ("Page 7" equals "Page 8"), it appears among the first or last three
+   lines of at least 60% of a PDF's pages and contains at least three letters. Searching only
+   the page edges means a table heading or "Step 1" that recurs mid-page is never removed; the
+   letter rule means bare list numbers are never removed. The report lists what was stripped,
+   as the manual asks.
+5. **A PDF heading's number must contain a dot.** "13. Audible alert codes" and "11.2
+   Replacing..." are headings; "50 Hz. Do not use..." (a wrapped line) and "48 W; standby" (a
+   table cell) are not. The first version of the rule matched both false positives; they were
+   found by listing every match in the real manual.
+6. **A custom DOCX loader.** LangChain's `Docx2txtLoader` flattens the file and loses the
+   headings, so it cannot say which section a sentence came from. `DocxSectionLoader` is a
+   LangChain `BaseLoader` that walks paragraphs and tables in order and starts a new Document at
+   each Word heading. Tables become "cell | cell" rows.
+7. **Pricing rows become self-describing sentences** (manual mistake #13): "Sediment
+   pre-filter PF-1 (SKU F5-PF1), replacement filter for the AquaPearl 500 Pro. ... List price:
+   PKR 2,400. Current promotional price: PKR 1,990." A price can never be separated from the
+   product it belongs to.
+8. **One bad file never stops the run.** The loader call is wrapped in a broad `except`,
+   because third-party parsers raise many different exception types for bad files.
+   `_skip_reason` turns the common ones into plain reasons ("password-protected PDF",
+   "corrupt DOCX").
+9. **Duplicates are skipped by content hash**, so a copied file is reported as "duplicate of
+   policy.md" instead of doubling its chunks.
+10. **Files whose names start with `_` or `.` are never loaded.** The answer key of planted gaps
+    lives in such a file; if it were ingested, the "unanswerable" questions would be answered
+    from it.
+11. **pypdf's own warnings are muted to errors.** For a corrupt file, pypdf logs "EOF marker not
+    found" before our loader logs its warning; the manual asks for one clear warning naming the
+    file.
+
+### Evidence (real output)
+
+```text
+$ python -m src.ingestion.report --kb-dir <copy of the knowledge base plus a corrupt PDF>
+WARNING | src.ingestion.loaders | Skipping warranty_scan_2025.pdf: unreadable or corrupt PDF (Stream has ended unexpectedly)
+INFO    | src.ingestion.loaders | Ingestion finished: 13 files found, 12 loaded, 1 skipped
+(exit code 0)
+
+$ python -m src.ingestion.report
+Files found: 12, loaded: 12, skipped: 0. Documents (structural units) produced: 220.
+Stripped from the manual: "AquaPearl # Pro User Manual | Revision C | Firmware #.#", "Page #",
+"Pearlz Home Systems (Pvt.) Ltd. | pearlzhome.example"
+```
+
+The full per-file table is in `evaluation/results/ingestion_report.md`. `pytest`: 73 passed.
+
+### Viva questions this prepares
+
+- **Mistake #2 (metadata lost during splitting):** "Our loaders attach the contract to every
+  unit before any splitting happens, and `test_every_document_carries_the_metadata_contract`
+  checks every document. Task 03 checks it again after splitting."
+- **Mistake #13 (tabular data ingested as prose):** "Each pricing row is one Document and one
+  sentence that names the SKU and the product next to the price."
+- **Q19, the ingestion-time defence:** "Ingestion is where a real system would scan for
+  instruction-like text. We deliberately do not strip the planted line, so we can show that the
+  prompt-level defence holds. In production we would flag such lines for human review at
+  ingestion."

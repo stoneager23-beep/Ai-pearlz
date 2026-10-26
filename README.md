@@ -15,7 +15,8 @@ The project is built task by task, following the assignment manual. This README 
 | Task | Topic | Status |
 |---|---|---|
 | T01 | Project setup and configuration | Done |
-| T02 | Document ingestion | Not started |
+| — | Knowledge base (12 documents) | Done |
+| T02 | Document ingestion | Done |
 | T03 | Chunking strategy | Not started |
 | T04 | Embeddings | Not started |
 | T05 | Vector store | Not started |
@@ -60,6 +61,36 @@ If the project folder is inside OneDrive, Dropbox or iCloud, create the virtual 
 outside it (for example `python -m uv venv --python 3.11 %USERPROFILE%\.venvs\supportpearlz`),
 or the sync client will try to upload thousands of package files.
 
+## The knowledge base
+
+`data/knowledge_base/` holds 12 documents for the fictional company Pearlz Home Systems, in five
+formats: two PDFs (the AquaPearl 500 Pro manual and the installation guide), two DOCX files
+(service agreement, privacy policy), six Markdown files (warranty, refunds, shipping,
+troubleshooting, FAQ, support handbook), a plain-text firmware changelog and a CSV price list.
+About 15,000 words in total.
+
+> **Pearlz Home Systems and all of its products, partners, policies, phone numbers and
+> addresses are fictional**, written for this assignment. Email addresses use the reserved
+> `.example` domain.
+
+- `_catalog.json` gives every document its `doc_type`, product lines, version and date.
+- `_PLANTED_SEAMS_AND_GAPS.md` is the answer key of deliberately planted cross-document facts,
+  unanswerable questions and a prompt-injection line. Files starting with `_` are never
+  ingested.
+- The PDF and DOCX files are generated from editable Markdown in `data/kb_sources/`. After
+  editing a source, run `python -m scripts.render_kb_documents` (needs `requirements-dev.txt`).
+
+### Checking ingestion
+
+```bash
+python -m src.ingestion.report
+```
+
+Loads every document without calling OpenAI and prints a per-file report (type, characters,
+pages, structural units, metadata keys, and any running headers or footers stripped). The
+report is also saved to `evaluation/results/ingestion_report.md`. Unreadable files are skipped
+with a warning; the rest still load.
+
 ## The OpenAI API key
 
 - **Streamlit app:** always asks the visitor for their own key, locally and when deployed. It
@@ -88,6 +119,7 @@ app's secrets. Invalid values stop the program with one message naming the varia
 | `KNOWLEDGE_BASE_DIR` | `data/knowledge_base` | Folder of source documents. |
 | `VECTOR_STORE_DIR` | `data/vector_store` | Where the index is saved (git-ignored). |
 | `COLLECTION_NAME` | `pearlz_kb` | Name of the index inside `VECTOR_STORE_DIR`. |
+| `RESULTS_DIR` | `evaluation/results` | Where experiment and evaluation scripts write their tables. |
 | `CHUNK_SIZE` | `800` | Maximum characters per chunk. Provisional until the T03 experiment. |
 | `CHUNK_OVERLAP` | `120` | Characters shared by neighbouring chunks. Provisional until T03. |
 | `RETRIEVAL_K` | `4` | Chunks retrieved per question. Provisional until T06. |
@@ -120,11 +152,20 @@ valid on Linux, which Streamlit Community Cloud runs.
 requirements.in/.txt    runtime dependencies / exact pinned lock (installed by Streamlit Cloud)
 requirements-dev.in/.txt  adds pytest and ruff
 pyproject.toml          ruff and pytest configuration
+data/
+  knowledge_base/       the 12 source documents, _catalog.json, planted-gaps answer key
+  kb_sources/           editable Markdown sources of the PDF and DOCX documents
+scripts/
+  render_kb_documents.py  rebuilds the PDF and DOCX documents from kb_sources
 src/
   config.py             validated settings; `python -m src.config` smoke check
   utils/api_keys.py     key format checks, masking, redaction, CLI key lookup
   utils/logging_setup.py  console + file logging with key redaction
-  ingestion/  retrieval/  chains/   filled in by later tasks
+  ingestion/loaders.py  file-type dispatch, metadata contract, per-file error handling
+  ingestion/text_cleaning.py  whitespace, running headers/footers, section splitting
+  ingestion/report.py   `python -m src.ingestion.report`
+  retrieval/  chains/   filled in by later tasks
+evaluation/results/     generated reports and experiment tables
 tests/                  pytest suite
 docs/CODE_WALKTHROUGH.md  what every file does and why, task by task
 ```
