@@ -128,8 +128,13 @@ decision, tokens, latency), `/quit` leaves. Every turn is logged as one JSON lin
 ## The web app
 
 ```bash
-streamlit run streamlit_app.py      # then open http://localhost:8501
+# from the project's virtual environment (see Setup), not the system Python
+python -m streamlit run streamlit_app.py      # then open http://localhost:8501
 ```
+
+Start it from the activated virtual environment. A bare `streamlit run` can pick up another
+Python on your PATH that lacks the project's packages; the page then says which package is
+missing.
 
 1. **Key gate.** The first screen asks for your own OpenAI API key, locally and when deployed.
    The key is checked offline for its format, then with one tiny embedding request. Each failure
