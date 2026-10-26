@@ -20,9 +20,17 @@ code, .sp-mono { font-family: var(--font-mono); font-size: var(--text-xs); }
 ::selection { background: var(--aqua-soft); }
 
 /* ---- Hide stock chrome ------------------------------------------------------------- */
-[data-testid="stHeader"], [data-testid="stToolbar"], [data-testid="stDecoration"],
+/* The header stays, see-through, because it holds the button that reopens a closed sidebar.
+   Only the menu, toolbar actions, deploy button and running indicator are hidden. */
+[data-testid="stHeader"] { background: transparent; }
+[data-testid="stToolbarActions"], [data-testid="stMainMenu"], [data-testid="stDecoration"],
 [data-testid="stStatusWidget"], [data-testid="stAppDeployButton"], #MainMenu, footer,
 .stDeployButton { display: none !important; }
+[data-testid="stExpandSidebarButton"] {
+  color: var(--text-soft); background: var(--ink-850); border: 1px solid var(--hairline-strong);
+  border-radius: var(--radius-md);
+}
+[data-testid="stExpandSidebarButton"]:hover { color: var(--aqua); border-color: var(--aqua-line); }
 
 /* ---- Layout ------------------------------------------------------------------------ */
 .block-container, [data-testid="stMainBlockContainer"] {

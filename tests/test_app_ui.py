@@ -167,3 +167,11 @@ def test_page_source_never_contains_the_key(app, fake_key):
 
     page = " ".join(block.value for block in app.markdown)
     assert fake_key[:12] not in page
+
+
+def test_stylesheet_keeps_the_button_that_reopens_the_sidebar():
+    css = (PROJECT_ROOT / "app" / "assets" / "styles.css").read_text("utf-8")
+    hidden = [rule.split("{")[0] for rule in css.split("}") if "display: none" in rule]
+
+    for testid in ("stHeader", "stToolbar", "stExpandSidebarButton"):
+        assert not any(f'"{testid}"' in selectors for selectors in hidden), testid
