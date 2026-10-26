@@ -95,6 +95,7 @@ class Settings(BaseSettings):
     knowledge_base_dir: Path = Path("data/knowledge_base")
     vector_store_dir: Path = Path("data/vector_store")
     collection_name: str = Field(default="pearlz_kb", pattern=r"^[A-Za-z0-9_-]+$")
+    results_dir: Path = Path("evaluation/results")
 
     chunk_size: int = Field(default=800, gt=0)
     chunk_overlap: int = Field(default=120, ge=0)
@@ -127,7 +128,7 @@ class Settings(BaseSettings):
     def _upper_case_level(cls, value: object) -> object:
         return value.upper() if isinstance(value, str) else value
 
-    @field_validator("knowledge_base_dir", "vector_store_dir", "log_dir")
+    @field_validator("knowledge_base_dir", "vector_store_dir", "results_dir", "log_dir")
     @classmethod
     def _resolve_from_project_root(cls, path: Path) -> Path:
         return path if path.is_absolute() else PROJECT_ROOT / path

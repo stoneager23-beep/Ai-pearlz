@@ -24,6 +24,9 @@ _LOG_FILE_BACKUPS = 3
 _HANDLER_NAME_PREFIX = "supportpearlz"
 # Libraries that log one line per HTTP request at INFO. Their warnings still come through.
 _CHATTY_LIBRARIES = ("httpx", "httpcore", "openai", "urllib3", "faiss")
+# pypdf warns about every harmless quirk in a readable PDF. A file it cannot read is reported
+# by the loader as one clear warning naming the file, so only pypdf's errors are kept.
+_PDF_LIBRARY = "pypdf"
 
 
 class ApiKeyRedactionFilter(logging.Filter):
@@ -81,6 +84,7 @@ def configure_logging(settings: Settings) -> None:
     root.setLevel(settings.log_level)
     for library in _CHATTY_LIBRARIES:
         logging.getLogger(library).setLevel(logging.WARNING)
+    logging.getLogger(_PDF_LIBRARY).setLevel(logging.ERROR)
 
     # If a handler itself fails (disk full, closed stream), the standard library prints the
     # original exception straight to stderr, bypassing every filter, so a key inside it would

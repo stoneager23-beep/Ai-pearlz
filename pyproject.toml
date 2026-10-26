@@ -28,8 +28,13 @@ select = [
 "tests/**" = ["ANN"]
 # Command-line entry points print their output for the user.
 "src/config.py" = ["T201"]
+"src/ingestion/report.py" = ["T201"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
 addopts = "-q"
+filterwarnings = [
+    # langchain-community is archived; its import warning is a known, documented limitation.
+    "ignore:`langchain-community` is being sunset:DeprecationWarning",
+]
