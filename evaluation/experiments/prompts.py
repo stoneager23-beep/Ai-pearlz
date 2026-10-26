@@ -19,7 +19,6 @@ Usage:  python -m evaluation.experiments.prompts
 Output: RESULTS_DIR/prompt_comparison.md
 """
 
-import re
 import sys
 from dataclasses import dataclass
 
@@ -29,6 +28,7 @@ from evaluation.experiments.common import (
     start_experiment,
     write_result,
 )
+from evaluation.scoring import asserts
 from src.chains.schemas import SupportResponse
 from src.chains.session import SupportSession
 from src.config import ConfigError, Settings
@@ -130,16 +130,8 @@ PROBES = (
 
 
 def raised_flags(probe: PromptProbe, answer: str) -> list[str]:
-    negated = re.compile(r"\b(not|no|cannot|can't|doesn't|does not|isn't|won't|unable)\b", re.I)
-    flags = []
-    for pattern in probe.red_flags:
-        for match in re.finditer(pattern, answer, flags=re.IGNORECASE):
-            sentence_start = answer.rfind(".", 0, match.start()) + 1
-            sentence = answer[sentence_start : answer.find(".", match.end()) + 1 or None]
-            if not negated.search(sentence):
-                flags.append(pattern)
-                break
-    return flags
+    """The red-flag patterns the answer actually asserts (negated sentences do not count)."""
+    return [pattern for pattern in probe.red_flags if asserts(pattern, answer)]
 
 
 def ask_fresh(settings: Settings, store: object, api_key: str, question: str) -> SupportResponse:

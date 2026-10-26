@@ -157,6 +157,14 @@ def _snippet(chunk: Document, claim: str) -> str:
     return textwrap.shorten(" ".join(best.split()), SNIPPET_CHARACTERS, placeholder="...")
 
 
+_NUMBERED_MARKER = re.compile(r"\s*\[\d+\]")
+
+
+def strip_citation_markers(answer: str) -> str:
+    """Remove "[1]"-style markers, for answers shown without a sources list (refusals)."""
+    return _SPACE_BEFORE_PUNCTUATION.sub(r"", _NUMBERED_MARKER.sub("", answer)).strip()
+
+
 def resolve_citations(draft: AnswerDraft, supplied: dict[str, Document]) -> ResolvedAnswer:
     """Keep only supplied labels, merge those pointing at the same place, and renumber."""
     claimed = _labels_in_order(draft)

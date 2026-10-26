@@ -37,6 +37,12 @@ _NOT_COVERED = re.compile(
     re.IGNORECASE,
 )
 _PRICE = re.compile(r"PKR\s?[\d,]+")
+# Words that turn a sentence into a denial or a doubt rather than a claim.
+_NEGATION = re.compile(
+    r"\b(not|no|never|cannot|can't|doesn't|isn't|won't|unable|whether)\b"
+    r"|n\N{RIGHT SINGLE QUOTATION MARK}t\b",
+    re.IGNORECASE,
+)
 
 
 class Verdict(StrEnum):
@@ -95,6 +101,25 @@ class CaseScore:
 
 def _matches(pattern: str, text: str) -> bool:
     return re.search(pattern, text, flags=re.IGNORECASE) is not None
+
+
+def _sentence_around(text: str, start: int, end: int) -> str:
+    sentence_start = max(text.rfind(mark, 0, start) for mark in ".!?\n") + 1
+    ends = [position for mark in ".!?\n" if (position := text.find(mark, end)) != -1]
+    return text[sentence_start : min(ends) + 1 if ends else len(text)]
+
+
+def asserts(pattern: str, text: str) -> bool:
+    """True if `text` makes the claim described by `pattern`, rather than denying or doubting it.
+
+    A forbidden pattern matched inside a negated or hedged sentence is not a claim: "the
+    documentation does not mention whether the filter is NSF-certified" must not count as
+    claiming that it is certified.
+    """
+    for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+        if not _NEGATION.search(_sentence_around(text, match.start(), match.end())):
+            return True
+    return False
 
 
 def is_partial_answer(response: SupportResponse) -> bool:
@@ -177,9 +202,7 @@ def score_case(
     final = responses[-1]
     answers = [r.answer for r in responses] if case.behaviour == "consistent" else [final.answer]
     missing = [fact for fact in case.key_facts if not all(_matches(fact, a) for a in answers)]
-    forbidden = [
-        pattern for pattern in case.forbidden if any(_matches(pattern, a) for a in answers)
-    ]
+    forbidden = [pattern for pattern in case.forbidden if any(asserts(pattern, a) for a in answers)]
     standalone_ok = not any(
         _matches(term, final.standalone_question) for term in case.standalone_must_not_contain
     )

@@ -208,3 +208,14 @@ def test_technical_errors_fail_and_say_so():
 
     assert score.verdict is Verdict.FAIL
     assert score.attribution.startswith("technical failure")
+
+
+def test_negated_or_hedged_sentences_are_not_claims():
+    case = _case(
+        "refuse", required_sources=(), key_facts=(), forbidden=(r"\bis (nsf[- ])?certified\b",)
+    )
+    refusal = "The documentation does not mention whether the filter is NSF-certified."
+    claim = "Yes, the filter is NSF-certified."
+
+    assert score_case(case, [_response(refusal, answered=False)], None, []).forbidden_found == []
+    assert score_case(case, [_response(claim, answered=False)], None, []).forbidden_found

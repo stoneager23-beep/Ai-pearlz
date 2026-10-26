@@ -29,7 +29,7 @@ from langchain_core.runnables import (
 )
 from pydantic import ValidationError
 
-from src.chains.citations import resolve_citations
+from src.chains.citations import resolve_citations, strip_citation_markers
 from src.chains.context import ContextBundle, build_context
 from src.chains.memory import build_condenser
 from src.chains.prompts import answer_prompt, format_question
@@ -154,7 +154,7 @@ def _finalise(
     else:
         refusal = None
     return SupportResponse(
-        answer=resolved.answer,
+        answer=resolved.answer if answered else strip_citation_markers(resolved.answer),
         sources=resolved.citations if answered else [],
         confidence=confidence,
         answered=answered,

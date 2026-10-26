@@ -4,6 +4,11 @@ Usage:
     python -m evaluation.run_eval                       # all cases
     python -m evaluation.run_eval --cases T-07,T-08     # a subset
     python -m evaluation.run_eval --model gpt-4o-mini   # another offered chat model
+    python -m evaluation.run_eval --rescore             # re-apply the rubric to saved answers
+
+`--rescore` makes no model calls: it re-scores the answers saved in eval_results.json (and the
+judge's saved verdicts) with the current rubric. It exists so that a fix to the grader never
+silently changes the system's answers.
 
 Each case runs in a fresh session (multi-turn cases ask their turns in order). The final turn
 is scored with the rubric in `evaluation/scoring.py`; answered turns are also checked for
@@ -36,7 +41,7 @@ from evaluation.scoring import EvalCase, is_hallucination, load_cases, score_cas
 from src.chains.context import build_context
 from src.chains.schemas import SupportResponse
 from src.chains.session import SupportSession
-from src.config import ConfigError, Settings
+from src.config import ConfigError, Settings, get_settings
 from src.errors import describe_failure
 from src.ingestion.embedding_cache import build_cached_embedder
 from src.ingestion.indexing import load_or_build
@@ -132,7 +137,7 @@ def aggregate(records: list[dict]) -> dict:
     }
 
 
-def render(records: list[dict], metrics: dict, settings: Settings, model_name: str) -> str:
+def render(records: list[dict], metrics: dict, settings: Settings, run: dict) -> str:
     rows = []
     for record in records:
         case, final, score = record["case"], record["responses"][-1], record["score"]
@@ -180,13 +185,18 @@ def render(records: list[dict], metrics: dict, settings: Settings, model_name: s
         [
             "# Evaluation results (Task 11)",
             "",
-            f"Run: {run_timestamp()}. Chat model `{model_name}`, temperature "
+            f"Run: {run['started']}. Chat model `{run['model']}`, temperature "
             f"{settings.llm_temperature}, prompts {settings.answer_prompt_version}+"
             f"{settings.condense_prompt_version}, k={settings.retrieval_k}, threshold "
             f"{settings.relevance_threshold}. Groundedness judge `{settings.eval_judge_model}` "
             f"(prompt {JUDGE_PROMPT_VERSION}). Verdicts and attributions are automatic proposals "
             "from `evaluation/scoring.py`; read the details before relying on them.",
             "",
+            *(
+                [f"Re-scored from the saved answers on {run['rescored']} (no new model calls).", ""]
+                if run.get("rescored")
+                else []
+            ),
             "## Aggregate metrics",
             "",
             markdown_table(["Metric", "Value"], metric_rows),
@@ -220,7 +230,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Run the SupportPearlz evaluation set.")
     parser.add_argument("--cases", help="Comma-separated case ids, e.g. T-07,T-08")
     parser.add_argument("--model", help="Chat model to evaluate (one of OPENAI_CHAT_MODELS)")
+    parser.add_argument(
+        "--rescore", action="store_true", help="Re-score saved answers; no model calls"
+    )
     args = parser.parse_args(argv)
+    if args.rescore:
+        return rescore()
     try:
         context = start_experiment()
     except (ConfigError, ApiKeyError) as error:
@@ -232,6 +247,7 @@ def main(argv: list[str] | None = None) -> int:
         wanted = {case_id.strip() for case_id in args.cases.split(",")}
         cases = [case for case in cases if case.id in wanted]
     model_name = args.model or settings.openai_chat_model
+    run = {"started": run_timestamp(), "model": model_name}
     try:
         index = load_or_build(settings, build_cached_embedder(context.api_key, settings))
         judge = build_chat_model(context.api_key, settings, settings.eval_judge_model)
@@ -246,14 +262,40 @@ def main(argv: list[str] | None = None) -> int:
         print(describe_failure(error).message, file=sys.stderr)
         return 1
 
+    return write_outputs(settings, run, records)
+
+
+def write_outputs(settings: Settings, run: dict, records: list[dict]) -> int:
     metrics = aggregate(records)
-    write_result(
-        settings, JSON_FILE, json.dumps({"metrics": metrics, "records": records}, indent=2)
-    )
-    path = write_result(settings, MARKDOWN_FILE, render(records, metrics, settings, model_name))
+    payload = {"run": run, "metrics": metrics, "records": records}
+    write_result(settings, JSON_FILE, json.dumps(payload, indent=2))
+    path = write_result(settings, MARKDOWN_FILE, render(records, metrics, settings, run))
     print(json.dumps(metrics, indent=2))
     print(f"Written to {path}")
     return 0
+
+
+def rescore() -> int:
+    """Re-apply the current rubric to the answers saved by the last run."""
+    settings = get_settings()
+    saved = json.loads((settings.results_dir / JSON_FILE).read_text(encoding="utf-8"))
+    cases = {case.id: case for case in load_cases()}
+    records = []
+    for record in saved["records"]:
+        case = cases[record["case"]["id"]]
+        responses = [SupportResponse.model_validate(item) for item in record["responses"]]
+        old = record["score"]
+        score = score_case(case, responses, old["grounded"], old["unsupported_claims"])
+        records.append(
+            {
+                "case": asdict(case),
+                "responses": record["responses"],
+                "score": {**asdict(score), "verdict": score.verdict.value},
+                "hallucination": is_hallucination(case, responses[-1], score),
+            }
+        )
+    run = {**saved["run"], "rescored": run_timestamp()}
+    return write_outputs(settings, run, records)
 
 
 if __name__ == "__main__":

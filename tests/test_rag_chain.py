@@ -173,3 +173,19 @@ def test_first_turn_is_not_rewritten(settings):
 
     assert model.condense_prompts == []
     assert response.standalone_question == response.original_question
+
+
+def test_refusal_shows_no_dangling_citation_markers(settings):
+    chunks = [scored_chunk("w::0", "Payment methods: card, transfer.", HIGH)]
+    refusal = draft(
+        "Instalments are not mentioned. You can pay by card [S1].",
+        ["S1"],
+        Confidence.NONE,
+        answered=False,
+    )
+
+    response, _ = _run(settings, chunks, [refusal])
+
+    assert response.sources == []
+    assert "[" not in response.answer
+    assert response.answer.endswith("You can pay by card.")
