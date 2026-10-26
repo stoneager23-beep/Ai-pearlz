@@ -20,7 +20,7 @@ The project is built task by task, following the assignment manual. This README 
 | T03 | Chunking strategy | Done |
 | T04 | Embeddings | Done |
 | T05 | Vector store | Done |
-| T06 | Retriever comparison and relevance gate | Not started |
+| T06 | Retriever comparison and relevance gate | Done |
 | T07 | The RAG chain | Not started |
 | T08 | Prompt engineering for grounding | Not started |
 | T09 | Conversational memory and follow-ups | Not started |
@@ -146,8 +146,11 @@ app's secrets. Invalid values stop the program with one message naming the varia
 | `CHUNK_SIZE` | `1500` | Maximum characters per chunk; shorter sections stay whole. Chosen by the T03 experiment. |
 | `CHUNK_OVERLAP` | `225` | Characters shared by neighbouring chunks of a long section (15%). |
 | `CHUNK_CONTEXT_HEADERS` | `true` | Start each chunk with "Document > section path". |
-| `RETRIEVAL_K` | `4` | Chunks retrieved per question. Provisional until T06. |
-| `RELEVANCE_THRESHOLD` | `0.30` | Minimum similarity before the pipeline refuses. Provisional until calibrated in T06. |
+| `RETRIEVAL_SEARCH_TYPE` | `similarity` | `similarity` or `mmr`. Similarity won the T06 comparison. |
+| `RETRIEVAL_K` | `4` | Chunks retrieved per question. Chosen in T06. |
+| `RETRIEVAL_FETCH_K` | `20` | Candidates considered before MMR or metadata filtering. |
+| `RETRIEVAL_MMR_LAMBDA` | `0.5` | MMR balance between relevance (1.0) and diversity (0.0). |
+| `RELEVANCE_THRESHOLD` | `0.34` | Minimum cosine similarity of the best chunk; below it the question is refused without calling the model. Calibrated in T06. |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR`. |
 | `LOG_DIR` | `logs` | Folder for the rotating log file. Logs also go to stdout. |
 
@@ -194,6 +197,7 @@ src/
   ingestion/build_index.py  `python -m src.ingestion.build_index`
   retrieval/vector_store.py  FAISS save/load with a manifest
   retrieval/search.py   `python -m src.retrieval.search`
+  retrieval/retriever.py  scored retriever (similarity or MMR, metadata filters) and relevance gate
   llm/clients.py        the only place OpenAI objects are created (always from an explicit key)
   errors.py             every failure to one short, human message
   chains/               filled in by later tasks

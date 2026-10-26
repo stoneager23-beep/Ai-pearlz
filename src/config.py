@@ -125,8 +125,11 @@ class Settings(BaseSettings):
     chunk_size: int = Field(default=1500, gt=0)
     chunk_overlap: int = Field(default=225, ge=0)
     chunk_context_headers: bool = True
+    retrieval_search_type: Literal["similarity", "mmr"] = "similarity"
     retrieval_k: int = Field(default=4, ge=1)
-    relevance_threshold: float = Field(default=0.30, ge=0.0, le=1.0)
+    retrieval_fetch_k: int = Field(default=20, ge=1)
+    retrieval_mmr_lambda: float = Field(default=0.5, ge=0.0, le=1.0)
+    relevance_threshold: float = Field(default=0.34, ge=0.0, le=1.0)
 
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     log_dir: Path = Path("logs")
@@ -175,6 +178,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 f"CHUNK_OVERLAP ({self.chunk_overlap}) must be smaller than "
                 f"CHUNK_SIZE ({self.chunk_size})"
+            )
+        if self.retrieval_fetch_k < self.retrieval_k:
+            raise ValueError(
+                f"RETRIEVAL_FETCH_K ({self.retrieval_fetch_k}) must be at least "
+                f"RETRIEVAL_K ({self.retrieval_k})"
             )
         if self.openai_chat_model not in self.openai_chat_models:
             raise ValueError(

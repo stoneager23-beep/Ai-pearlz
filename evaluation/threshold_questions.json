@@ -1,0 +1,38 @@
+{
+  "description": "Calibration set for the relevance gate (Task 06). Deliberately different wording from the 20 evaluation test cases, so the threshold is not tuned on the test set. 'answerable' questions have answers in the knowledge base; 'gap' questions are about Pearlz but are not answered by any document; 'off_topic' questions have nothing to do with Pearlz.",
+  "answerable": [
+    "What is the tank capacity of the AquaPearl 500 Pro?",
+    "How often should I replace the carbon block?",
+    "Is international shipping available?",
+    "How do I pair the purifier with my phone?",
+    "What does the Premium maintenance plan include?",
+    "How long do card refunds take?",
+    "What is the maximum inlet water pressure?",
+    "Can I transfer the warranty if I sell my purifier?",
+    "How much is the HEPA filter for the AeroPearl Mini?",
+    "What happens if the courier can't deliver my parcel?",
+    "How do I delete my account in the app?",
+    "What is the restocking fee for an opened item?",
+    "What tools do I need to mount the purifier on the wall?",
+    "What does a blue flashing UV light mean?",
+    "Who do I contact about a privacy request?"
+  ],
+  "gap": [
+    "Is there a discount for university students or teachers?",
+    "Does the purifier have NSF/ANSI 58 certification?",
+    "Do you offer EMI or buy now pay later?",
+    "Is the purified water OK for mixing infant formula?",
+    "Will the AquaPearl remove lead and arsenic from my water?",
+    "Do you have a physical showroom in Karachi?",
+    "What is the warranty on the Pearlz water softener?",
+    "Can I rent a purifier instead of buying one?"
+  ],
+  "off_topic": [
+    "What's the capital of France?",
+    "Write me a poem about the sea.",
+    "Who won the cricket world cup in 2011?",
+    "What's the dollar exchange rate today?",
+    "How do I bake a chocolate cake?",
+    "Recommend a good laptop for programming."
+  ]
+}

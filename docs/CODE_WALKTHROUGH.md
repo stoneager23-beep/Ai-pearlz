@@ -635,3 +635,112 @@ things the retriever experiments in Task 06 measure.
   query time the only log line is 'Loaded index ... (no embeddings computed)'."
 - **Q4 / mistake #6:** "The manifest stores the embedding model and dimension; loading with a
   different model is refused (RUN 5)."
+
+---
+
+## T06: Retriever configuration, comparison and the relevance gate
+
+### What the manual asks for
+
+A retriever with configurable k; at least three strategies compared on the same 8-10 questions
+(small k, large k, MMR, optionally a threshold or metadata filter) with a stated metric such as
+hit@k; and a relevance gate whose threshold is calibrated on our own data.
+
+Acceptance: a comparison table of at least three strategies with hit@k, and a documented,
+empirically chosen threshold at which the system says "no relevant information found".
+
+### Files
+
+| File | What it does |
+|---|---|
+| `src/retrieval/retriever.py` | `ScoredRetriever` (a LangChain `BaseRetriever`: similarity or MMR, optional doc_type and product_line filters, cosine score in each result's metadata), `build_retriever`, `relevance_gate` and `GateDecision`. |
+| `evaluation/threshold_questions.json` | Calibration set: 15 answerable, 8 in-domain gap and 6 off-topic questions, worded differently from the 20 evaluation test cases. |
+| `evaluation/experiments/threshold.py` | `python -m evaluation.experiments.threshold` writes `threshold_calibration.md`. |
+| `evaluation/experiments/retrievers.py` | `python -m evaluation.experiments.retrievers` writes `retriever_comparison.md`. |
+| `tests/test_retriever.py` | 9 tests: scores attached, index documents never modified, MMR distinct, doc_type and product_line filters ("all" always included), settings, and the gate's three outcomes. |
+
+### Retriever comparison (real run, 2026-10-26, 10 retrieval questions)
+
+| Strategy | hit@k | MRR | Distinct documents | Chunks handed on |
+|---|---|---|---|---|
+| similarity, k=3 | 9/10 | 0.72 | 1.9 | 3.0 |
+| **similarity, k=4 (adopted)** | **9/10** | **0.72** | **2.0** | **4.0** |
+| similarity, k=8 | 9/10 | 0.72 | 2.6 | 8.0 |
+| MMR, k=4 | 6/10 | 0.60 | 2.9 | 4.0 |
+| MMR, k=8 | 8/10 | 0.63 | 3.9 | 8.0 |
+| similarity, k=8, threshold filter | 9/10 | 0.72 | 2.6 | 8.0 |
+| similarity, k=4, doc_type filter (oracle) | 9/10 | 0.78 | 1.2 | 3.7 |
+
+### Threshold calibration (real run)
+
+| Group | Questions | Best-chunk similarity: min / median / max |
+|---|---|---|
+| answerable | 15 | 0.491 / 0.644 / 0.776 |
+| in-domain gap | 8 | 0.304 / 0.445 / 0.691 |
+| off-topic | 6 | 0.072 / 0.157 / 0.192 |
+
+**RELEVANCE_THRESHOLD = 0.34**, the midpoint of the highest off-topic score (0.192) and the
+lowest answerable score (0.491). At 0.34: 15/15 answerable pass, 6/6 off-topic are refused,
+1/8 gap questions are refused.
+
+### Design decisions and why
+
+1. **Similarity, k=4.** k=3, 4 and 8 tie on hit@k and MRR; the answer is almost always in the
+   top 3. k=4 keeps the context small (less noise and cost) while leaving room for a second
+   document. k=8 doubles the context for no measured gain. Multi-document questions (T-07)
+   are the risk with a small k; Task 11 checks them.
+2. **No MMR.** On these questions MMR lost three answers at k=4 (R05, R09, R10): pushing for
+   diversity swapped the one specific chunk holding the answer for chunks from other
+   documents. It raises diversity (2.9 documents against 2.0) but costs recall, and recall is
+   what the gate and the prompt depend on.
+3. **A score-carrying retriever.** The stock `as_retriever()` drops scores. `ScoredRetriever`
+   returns copies of the stored documents with `score` added, so the gate, the confidence
+   signal, the logs and the "Behind the answer" panel all see the same numbers. The copies
+   matter: the web app shares one index between sessions, and mutating stored documents would
+   leak one session's scores into another's.
+4. **The gate uses the best chunk's score, not the first chunk's.** With MMR or filters the
+   first chunk need not be the most similar; `test_gate_passes_on_the_best_chunk_not_the_first`
+   covers it.
+5. **The threshold is ours, and its limits are stated.** It separates off-topic questions from
+   answerable ones with a wide margin (0.192 against 0.491). It cannot separate in-domain gaps:
+   "Will the AquaPearl remove lead and arsenic?" scores 0.630 and "the Pearlz water softener"
+   (a product that does not exist) scores 0.691, higher than most real questions, because they
+   land on genuinely related text. That is the manual's T-13 warning measured. Those refusals
+   are the prompt's job (Task 08).
+6. **Calibration questions are separate from the test set**, so the threshold is not tuned on
+   the questions used to grade the system (manual mistake #14).
+7. **The oracle filter is labelled as an oracle.** It uses each question's ground-truth document
+   type, so its 0.78 MRR is the most that routing by document type could add, not something the
+   system achieves on its own.
+
+### A known miss, carried forward
+
+R08 ("What's your privacy policy on app data?") is not found by any strategy, even at k=8. Its
+top results are the privacy policy's introduction and the FAQ entry "What does the app know
+about me?", which are relevant but do not contain the telemetry detail the ground truth asks
+for. This is partly a retrieval limitation and partly a broad question. It stays in the
+failure analysis rather than being patched.
+
+### Viva questions this prepares
+
+- **Q7: What is k, and what does too low or too high cost?** "The number of chunks handed to
+  the model. Too low and the answer chunk falls outside the window; too high and irrelevant
+  chunks dilute the prompt and cost tokens. On our data k=3, 4 and 8 all scored 9/10 with MRR
+  0.72, so we took k=4: the answer is almost always in the top 3, with room for a second
+  document."
+- **Q8: What is MMR, and does it help here?** "It picks each next chunk by balancing relevance
+  against similarity to chunks already picked, to avoid near-duplicates. On our questions it
+  hurt: 6/10 at k=4 against 9/10, because for single-fact questions the most relevant chunk is
+  the answer, and diversity pushed it out."
+- **Q9: What stops irrelevant chunks?** "First the gate: below 0.34 we refuse without calling
+  the model. Then the prompt's grounding and refusal rules, then citation validation."
+- **Q10: Why is a threshold like 0.75 meaningless in general?** "Our scores are cosine
+  similarities from `text-embedding-3-small` with inner product on unit vectors. Our
+  answerable questions score 0.49 to 0.78; a borrowed 0.75 would refuse most of them. A
+  different model, metric or normalisation changes the whole scale."
+- **Q11: Evaluating retrieval without the LLM.** "Both experiments here: answer patterns per
+  question, hit@k and MRR, no generation involved. They are cheap, deterministic, and they
+  told us where a failure is retrieval's fault before any prompt work."
+- **Q16 (first half): pipeline refusal.** "The gate is a deterministic refusal before
+  generation: the model is never called for 'What's the capital of France?' (best similarity
+  0.072)."
