@@ -72,7 +72,7 @@ def main(argv: list[str] | None = None) -> int:
 
     report = render_ingestion_report(result, kb_dir)
     settings.results_dir.mkdir(parents=True, exist_ok=True)
-    (settings.results_dir / REPORT_FILE_NAME).write_text(report, encoding="utf-8")
+    (settings.results_dir / REPORT_FILE_NAME).write_text(report, encoding="utf-8", newline="\n")
     print(report)
     return 0
 

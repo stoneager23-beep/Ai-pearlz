@@ -119,9 +119,12 @@ class CachedEmbedder:
 
 def build_cached_embedder(api_key: str, settings: Settings) -> CachedEmbedder:
     """Embeddings for index builds: cache first, then OpenAI in counted, retried batches."""
-    counter = TokenCountingEmbeddings(
-        build_embeddings(api_key, settings), settings.openai_embedding_model
-    )
+    return cached_embedder_from(build_embeddings(api_key, settings), settings)
+
+
+def cached_embedder_from(underlying: Embeddings, settings: Settings) -> CachedEmbedder:
+    """Wrap any embeddings model with the counter and the cache (tests pass a fake model)."""
+    counter = TokenCountingEmbeddings(underlying, settings.openai_embedding_model)
     cached = CacheBackedEmbeddings.from_bytes_store(
         counter,
         SQLiteByteStore(settings.embedding_cache_path),

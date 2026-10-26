@@ -526,3 +526,112 @@ cosine similarity, and what breaks if documents and queries use different models
   name, and loading refuses a mismatch."
 - **Q3 (again):** "E-03 against E-08 scores 0.869 although they mean different things: exact
   codes are where keyword search wins."
+
+---
+
+## T05: Vector store
+
+### What the manual asks for
+
+Create the vector store with metadata and persist it to `data/vector_store/`; a `load_or_build`
+path with an explicit `--rebuild` flag; a similarity-search helper that prints score, source
+and the start of each chunk; proof that the index survives a restart without re-embedding; and
+an explicit answer, implemented, to "what happens when the refund policy is revised?".
+
+Acceptance: later runs start in a fraction of the first run's time, with a log line proving the
+index was loaded from disk; searching "how long is the warranty" returns warranty-policy chunks
+with visible scores.
+
+### Files
+
+| File | What it does |
+|---|---|
+| `src/retrieval/vector_store.py` | FAISS create, save and load. `IndexManifest` records what built the index; `load_vector_store` refuses an index that does not match the settings; `assert_unit_length` checks that scores are cosines. |
+| `src/ingestion/indexing.py` | `file_fingerprints`, `sync_index` (full build, incremental update or nothing, under a file lock), `index_is_current`, `load_or_build`. |
+| `src/ingestion/build_index.py` | `python -m src.ingestion.build_index [--rebuild]`: the one documented build command. |
+| `src/retrieval/search.py` | `python -m src.retrieval.search "query" [--k 5]`: the debugging search tool. |
+| `src/retrieval/locations.py` | `location_label`: "p. 16, 13. Audible alert codes", "§3.2 Exclusions", "SKU F5-PF1". |
+| `src/errors.py` | `describe_failure`: every failure to one short, human message (used by every command, and later the chat and the web app). |
+| `tests/test_indexing.py` | 12 tests with a fake embedding model: build then up to date, survives restart, changed file replaced (old text gone), only changed text re-embedded, removed file, settings change, wrong model refused, damaged manifest refused, missing index, `load_or_build`, fingerprints, concurrent builds. |
+| `tests/test_errors.py`, `tests/test_locations.py` | 32 and 5 tests: every OpenAI failure maps to a distinct, key-free message; location labels. |
+
+### Design decisions and why
+
+1. **A manifest next to the index.** `pearlz_kb.manifest.json` records the embedding model and
+   dimension, chunk size, overlap, headers, a fingerprint per file, the chunk ids of every
+   source, the build time and the library versions. Loading compares it with the settings
+   and refuses a mismatch with a message saying exactly what differs (manual mistake #6).
+2. **Fingerprints, not timestamps.** Each file's fingerprint is a SHA-256 of its content plus its
+   catalogue entry, with line endings normalised. A Windows checkout (CRLF) and the Linux
+   server (LF) agree, and a metadata change (a new version number) counts as a change.
+3. **Incremental update by delete-then-insert, per source.** For a changed file, its old chunk
+   ids (from the manifest) are deleted, then the file is re-loaded, re-chunked and inserted.
+   Re-adding without deleting would leave the old and the new refund policy both retrievable.
+   This is the answer to viva Q20, implemented and tested.
+4. **The embedding cache makes rebuilds cheap.** After editing one sentence of the refund
+   policy, 10 chunks were replaced but only 1 was embedded (55 tokens): the other 9 had
+   identical text.
+5. **A file lock around every build.** Two Streamlit visitors arriving at a fresh deployment, or
+   a CLI build while the app runs, wait for each other instead of both building.
+   `test_a_second_build_waits_for_the_first_and_then_reports_clearly` holds the lock and checks
+   the second build gives the "still being prepared" message.
+6. **The manifest is written last**, and loading checks the index's vector count and dimension
+   against it, so a crash between writing the files is detected rather than silently used.
+7. **`allow_dangerous_deserialization=True` is documented, not hidden.** LangChain's FAISS stores
+   chunk texts in a Python pickle. It is only ever loaded from our own `VECTOR_STORE_DIR`; the
+   code comment says never to point that setting at files from elsewhere.
+8. **Commands never show a traceback.** Each command has a last-line `except` that logs the
+   exception type and status (`log_detail`) with the stack trace in the log file, and prints
+   only `describe_failure(error).message`.
+
+### Evidence (real runs, 2026-10-26, in a temporary folder with an empty cache)
+
+```text
+RUN 1: python -m src.ingestion.build_index          (cold: no index, empty cache)
+Embedded 64 chunks (6561 tokens) in 1.8s ... Embedded 34 chunks (4735 tokens) in 1.5s
+Index full build (no saved index yet).
+  Chunks added: 226. Sent to OpenAI: 226 chunks, 24,888 tokens. Time: 7.3s
+
+RUN 2: the same command again
+Index up to date (no file has changed since the last build).
+  Sent to OpenAI: 0 chunks, 0 tokens. Time: 0.0s
+
+RUN 3: python -m src.retrieval.search "how long is the warranty" --k 4    (new process)
+Loaded index pearlz_kb from disk: 226 chunks, model text-embedding-3-small, built 2026-10-26T08:49:55+00:00 (no embeddings computed)
+1. 0.614  warranty_policy.md::0008   §4.3 Repairs and replacements
+2. 0.576  faq.md::0019               "How long is my warranty?"  (contains "24 months")
+3. 0.555  warranty_policy.md::0009   §5. If you sell or give away your product
+4. 0.551  warranty_policy.md::0012   §8. After the warranty ends
+
+RUN 4: refund policy edited (14 -> 30 days), build again
+Incremental update: added [], changed ['refund_returns_policy.md'], removed []
+  Chunks removed: 10, added: 10. Sent to OpenAI: 1 chunk, 55 tokens. Time: 0.6s
+
+RUN 5: OPENAI_EMBEDDING_MODEL=text-embedding-3-large, load the saved index
+refused: The saved index was built with different settings (embedding model: index has
+text-embedding-3-small, settings say text-embedding-3-large; embedding dimension: index has
+1536, settings say 3072). Rebuild it: python -m src.ingestion.build_index --rebuild
+
+RUN 6: CHUNK_SIZE=800, build
+Index full build (settings changed: chunk size: index has 1500, settings say 800; ...)
+  Sent to OpenAI: 44 chunks, 6,529 tokens (the other 202 came from the cache)
+```
+
+**An honest note on RUN 3.** The question does not name a product, and the top hit is §4.3
+(how repairs affect the warranty period), not the §2 table of warranty periods. The FAQ answer
+with "24 months" is second. Tables embed less distinctively than prose; this is one of the
+things the retriever experiments in Task 06 measure.
+
+### Viva questions this prepares
+
+- **Q20: The refund policy is amended today. What must happen?** "Run `python -m
+  src.ingestion.build_index`. It sees that the file's fingerprint changed, deletes that file's
+  chunks by id, re-chunks it and inserts the new chunks. In our run, 10 chunks were replaced
+  and only the 1 edited chunk was embedded. If we did nothing, the old 14-day rule would keep
+  being retrieved. If we re-added without deleting, both versions would be in the index and the
+  answer would depend on which chunk happened to rank higher, which is worse because no single
+  answer reveals it."
+- **Mistake #1 (rebuilding on every run):** "Every embedding call logs 'Embedded N chunks'. At
+  query time the only log line is 'Loaded index ... (no embeddings computed)'."
+- **Q4 / mistake #6:** "The manifest stores the embedding model and dimension; loading with a
+  different model is refused (RUN 5)."

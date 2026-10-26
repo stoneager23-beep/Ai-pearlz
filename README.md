@@ -17,9 +17,9 @@ The project is built task by task, following the assignment manual. This README 
 | T01 | Project setup and configuration | Done |
 | — | Knowledge base (12 documents) | Done |
 | T02 | Document ingestion | Done |
-| T03 | Chunking strategy | Not started |
-| T04 | Embeddings | Not started |
-| T05 | Vector store | Not started |
+| T03 | Chunking strategy | Done |
+| T04 | Embeddings | Done |
+| T05 | Vector store | Done |
 | T06 | Retriever comparison and relevance gate | Not started |
 | T07 | The RAG chain | Not started |
 | T08 | Prompt engineering for grounding | Not started |
@@ -91,6 +91,25 @@ pages, structural units, metadata keys, and any running headers or footers strip
 report is also saved to `evaluation/results/ingestion_report.md`. Unreadable files are skipped
 with a warning; the rest still load.
 
+## Building the index
+
+```bash
+python -m src.ingestion.build_index            # build if missing, otherwise update what changed
+python -m src.ingestion.build_index --rebuild  # rebuild everything from scratch
+python -m src.retrieval.search "how long is the warranty" --k 5   # inspect retrieval
+```
+
+The build loads the knowledge base, splits it into chunks, embeds them with
+`text-embedding-3-small` and saves a FAISS index to `data/vector_store/` (git-ignored), with a
+manifest of what built it. Running it again only processes files that changed: their old
+chunks are deleted and replaced. Embeddings are cached in `data/embedding_cache/`, so text that
+was embedded before is never paid for twice. A full build of this knowledge base embeds about
+25,000 tokens (well under one US cent at OpenAI's published price).
+
+The chat and the web app load the saved index at start-up and build it only if it is missing
+or out of date. An index built with a different embedding model or different chunk settings
+is never used; it is rebuilt.
+
 ## The OpenAI API key
 
 - **Streamlit app:** always asks the visitor for their own key, locally and when deployed. It
@@ -116,12 +135,17 @@ app's secrets. Invalid values stop the program with one message naming the varia
 | `OPENAI_CHAT_MODELS` | `gpt-4.1-mini,gpt-4.1,gpt-4o-mini,gpt-4o` | Chat models users may pick from. |
 | `OPENAI_EMBEDDING_MODEL` | `text-embedding-3-small` | Embedding model for indexing and querying. Changing it needs a full rebuild. |
 | `LLM_TEMPERATURE` | `0` | Sampling temperature, 0 to 0.3. |
+| `OPENAI_TIMEOUT_SECONDS` | `30` | Seconds before an OpenAI request is abandoned. |
+| `OPENAI_MAX_RETRIES` | `4` | Retries with exponential backoff after a timeout, rate limit or server error. |
+| `EMBEDDING_BATCH_SIZE` | `64` | Chunks per embedding request; each finished batch is cached. |
 | `KNOWLEDGE_BASE_DIR` | `data/knowledge_base` | Folder of source documents. |
 | `VECTOR_STORE_DIR` | `data/vector_store` | Where the index is saved (git-ignored). |
 | `COLLECTION_NAME` | `pearlz_kb` | Name of the index inside `VECTOR_STORE_DIR`. |
+| `EMBEDDING_CACHE_PATH` | `data/embedding_cache/embeddings.sqlite3` | Cache of computed embeddings (git-ignored). |
 | `RESULTS_DIR` | `evaluation/results` | Where experiment and evaluation scripts write their tables. |
-| `CHUNK_SIZE` | `800` | Maximum characters per chunk. Provisional until the T03 experiment. |
-| `CHUNK_OVERLAP` | `120` | Characters shared by neighbouring chunks. Provisional until T03. |
+| `CHUNK_SIZE` | `1500` | Maximum characters per chunk; shorter sections stay whole. Chosen by the T03 experiment. |
+| `CHUNK_OVERLAP` | `225` | Characters shared by neighbouring chunks of a long section (15%). |
+| `CHUNK_CONTEXT_HEADERS` | `true` | Start each chunk with "Document > section path". |
 | `RETRIEVAL_K` | `4` | Chunks retrieved per question. Provisional until T06. |
 | `RELEVANCE_THRESHOLD` | `0.30` | Minimum similarity before the pipeline refuses. Provisional until calibrated in T06. |
 | `LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING` or `ERROR`. |
@@ -164,9 +188,20 @@ src/
   ingestion/loaders.py  file-type dispatch, metadata contract, per-file error handling
   ingestion/text_cleaning.py  whitespace, running headers/footers, section splitting
   ingestion/report.py   `python -m src.ingestion.report`
-  retrieval/  chains/   filled in by later tasks
-evaluation/results/     generated reports and experiment tables
-tests/                  pytest suite
+  ingestion/chunking.py  splitting inside sections, context headers, length checks
+  ingestion/embedding_cache.py  cached, batched, token-counted embeddings
+  ingestion/indexing.py  full build, incremental update, load_or_build
+  ingestion/build_index.py  `python -m src.ingestion.build_index`
+  retrieval/vector_store.py  FAISS save/load with a manifest
+  retrieval/search.py   `python -m src.retrieval.search`
+  llm/clients.py        the only place OpenAI objects are created (always from an explicit key)
+  errors.py             every failure to one short, human message
+  chains/               filled in by later tasks
+evaluation/
+  retrieval_questions.json  retrieval ground truth for the chunking and retriever experiments
+  experiments/          runnable experiments (chunking, embedding diagnostic, ...)
+  results/              generated reports and experiment tables
+tests/                  pytest suite (never calls OpenAI)
 docs/CODE_WALKTHROUGH.md  what every file does and why, task by task
 ```
 

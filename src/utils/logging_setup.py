@@ -8,6 +8,7 @@ created on that exact logger, so a key inside an `openai` or `httpx` message wou
 Every record that reaches an output passes through a handler, so this placement covers them all.
 """
 
+import io
 import logging
 import sys
 from logging.handlers import RotatingFileHandler
@@ -27,6 +28,16 @@ _CHATTY_LIBRARIES = ("httpx", "httpx2", "httpcore", "openai", "urllib3", "faiss"
 # pypdf warns about every harmless quirk in a readable PDF. A file it cannot read is reported
 # by the loader as one clear warning naming the file, so only pypdf's errors are kept.
 _PDF_LIBRARY = "pypdf"
+
+
+def use_utf8_console() -> None:
+    """Write UTF-8 to stdout and stderr, so characters such as the section sign print correctly.
+
+    On Windows, Python writes piped output in the legacy cp1252 encoding by default.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if isinstance(stream, io.TextIOWrapper):
+            stream.reconfigure(encoding="utf-8")
 
 
 class ApiKeyRedactionFilter(logging.Filter):
@@ -55,6 +66,7 @@ def configure_logging(settings: Settings) -> None:
     Safe to call repeatedly (Streamlit re-runs the script on every interaction): handlers
     installed by an earlier call are replaced, never duplicated.
     """
+    use_utf8_console()
     root = logging.getLogger()
     for handler in list(root.handlers):
         if handler.get_name() and handler.get_name().startswith(_HANDLER_NAME_PREFIX):

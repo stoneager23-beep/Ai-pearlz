@@ -25,7 +25,7 @@ import hashlib
 import json
 import logging
 import zipfile
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Collection, Iterator
 from dataclasses import dataclass, field
 from datetime import date
 from enum import StrEnum
@@ -377,10 +377,12 @@ def _is_ignored(path: Path, kb_dir: Path) -> bool:
     return any(part.startswith(IGNORED_NAME_PREFIXES) for part in path.relative_to(kb_dir).parts)
 
 
-def load_knowledge_base(kb_dir: Path) -> IngestionResult:
+def load_knowledge_base(kb_dir: Path, only: Collection[str] | None = None) -> IngestionResult:
     """Load every supported file under `kb_dir` (recursively) into Documents.
 
-    One bad file never stops the run: it is logged with a warning and reported as skipped.
+    `only`, if given, restricts loading to those file names (an incremental index update
+    re-reads just the files that changed). One bad file never stops the run: it is logged
+    with a warning and reported as skipped.
     """
     if not kb_dir.is_dir():
         raise IngestionError(f"Knowledge-base folder {kb_dir} does not exist.")
@@ -392,6 +394,8 @@ def load_knowledge_base(kb_dir: Path) -> IngestionResult:
         if not path.is_file() or _is_ignored(path, kb_dir):
             continue
         name = path.relative_to(kb_dir).as_posix()
+        if only is not None and name not in only:
+            continue
         file_type = path.suffix.lower().lstrip(".")
 
         def skip(reason: str, name: str = name, file_type: str = file_type) -> None:
