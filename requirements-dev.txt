@@ -45,6 +45,7 @@ certifi==2026.10.23
 charset-normalizer==3.5.2
     # via
     #   -c requirements.txt
+    #   reportlab
     #   requests
 click==8.5.0
     # via
@@ -232,6 +233,7 @@ pandas==3.1.0
 pillow==13.0.0
     # via
     #   -c requirements.txt
+    #   reportlab
     #   streamlit
 pluggy==1.7.0
     # via pytest
@@ -310,6 +312,8 @@ regex==2026.9.29
     # via
     #   -c requirements.txt
     #   tiktoken
+reportlab==5.1.0
+    # via -r requirements-dev.in
 requests==2.34.2
     # via
     #   -c requirements.txt

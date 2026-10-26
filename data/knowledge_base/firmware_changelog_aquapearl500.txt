@@ -1,0 +1,61 @@
+PEARLZ HOME SYSTEMS - AQUAPEARL 500 PRO FIRMWARE RELEASE NOTES
+Last updated: 3 July 2026
+
+Firmware updates install automatically over Wi-Fi while the purifier is connected to the
+Pearlz Home app. To check which version your purifier is running, open the app and go to
+Settings, then Device info. A purifier that has never been connected keeps the version it
+left the factory with; units manufactured from September 2025 onwards ship with 2.2.0.
+
+
+VERSION 2.4.1 - released 3 July 2026
+
+Fixes
+- The TDS reading on the display could freeze until the purifier was restarted.
+- The night-mode schedule was lost after a power cut.
+
+
+VERSION 2.4.0 - released 12 May 2026
+
+Important: change to alert codes
+- E-06 now means a fault in the UV-LED sterilisation module. It is signalled by a double
+  long tone with the UV indicator pulsing blue. Contact Pearlz support; do not open the
+  purifier.
+- Before version 2.4.0, E-06 meant low inlet water pressure. From version 2.4.0, low inlet
+  pressure is reported as E-01, with "LO P" shown on the display.
+- The printed User Manual (Revision C) and the Troubleshooting Guide (version 1.6) still
+  describe the earlier meaning of E-06.
+
+New features
+- Night mode: from 22:00 to 07:00 the display dims and alert tones are silenced, except
+  the leak alert E-02. Night mode is switched on and scheduled in the app.
+- The app now shows the litres remaining for each cartridge as well as the percentage.
+
+
+VERSION 2.3.0 - released 20 January 2026
+
+Improvements
+- More accurate TDS sensor calibration.
+- Pairing now works with routers that use WPA3 transition mode.
+
+Fixes
+- False E-02 leak alerts in very humid weather.
+
+
+VERSION 2.2.0 - released 15 September 2025
+
+New features
+- FLUSH button function: press and hold FLUSH for 3 seconds to start a 10-minute flush
+  cycle. On earlier versions the button has no function.
+- Filter life now counts both litres purified and days since reset; the alert is raised
+  by whichever runs out first.
+
+
+VERSION 2.1.0 - released 2 June 2025
+
+Improvements
+- Faster pairing with the Pearlz Home app. The WI-FI indicator now blinks during pairing.
+
+
+VERSION 2.0.0 - released 10 March 2025
+
+- Launch firmware for the AquaPearl 500 Pro.

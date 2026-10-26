@@ -1,0 +1,26 @@
+sku,product_name,product_line,category,description,list_price_pkr,promo_price_pkr,availability,compatible_with,notes
+AP500-PRO,AquaPearl 500 Pro,AquaPearl 500 Pro,purifier,"Smart 5-stage reverse-osmosis water purifier with UV-LED sterilisation, an 8-litre tank and Wi-Fi app control",89999,82999,in_stock,,"PF-1, CB-2, RO-3 and MN-4 cartridges come fitted"
+AP300,AquaPearl 300,AquaPearl 300,purifier,"3-stage reverse-osmosis water purifier with a 6-litre tank",54999,,in_stock,,
+AEM-MINI,AeroPearl Mini,AeroPearl Mini,air_purifier,"Compact air purifier with a HEPA H13 filter for rooms up to 25 square metres, with Wi-Fi app control",34999,31499,in_stock,,
+AP250,AquaPearl 250,AquaPearl 250,purifier,"Previous-generation 4-stage reverse-osmosis water purifier",,,discontinued,,"Discontinued on 30 June 2024; replacement filters are still sold"
+AEP-ONE,AeroPearl One,AeroPearl One,air_purifier,"Previous-generation air purifier",,,discontinued,,"Discontinued on 31 December 2023"
+F5-PF1,Sediment pre-filter PF-1,AquaPearl 500 Pro,filter,"Stage 1 polypropylene sediment cartridge, 5 micron; replace every 6 months or 3,000 litres",2400,1990,in_stock,AquaPearl 500 Pro,
+F5-CB2,Carbon block filter CB-2,AquaPearl 500 Pro,filter,"Stage 2 activated carbon block; replace every 12 months or 6,000 litres",3200,,in_stock,AquaPearl 500 Pro,
+F5-RO3,RO membrane RO-3,AquaPearl 500 Pro,filter,"Stage 3 reverse-osmosis membrane, 75 GPD; replace every 24 months or 12,000 litres",9500,8750,in_stock,AquaPearl 500 Pro,
+F5-MN4,Mineraliser MN-4,AquaPearl 500 Pro,filter,"Stage 4 mineral cartridge that adds calcium and magnesium; replace every 12 months or 6,000 litres",2900,,low_stock,AquaPearl 500 Pro,
+F5-KIT12,Annual filter kit for AquaPearl 500 Pro,AquaPearl 500 Pro,bundle,"Two PF-1 sediment pre-filters, one CB-2 carbon block and one MN-4 mineraliser: one year of scheduled replacements",10900,9490,in_stock,AquaPearl 500 Pro,The RO-3 membrane is not included
+F3-CP1,Composite pre-filter CP-1,AquaPearl 300,filter,"Stage 1 combined sediment and carbon cartridge; replace every 6 months",2600,,in_stock,AquaPearl 300,
+F3-RO2,RO membrane RO-2,AquaPearl 300,filter,"Stage 2 reverse-osmosis membrane; replace every 24 months",7800,,in_stock,AquaPearl 300,
+F3-PC3,Post-carbon filter PC-3,AquaPearl 300,filter,"Stage 3 taste-polishing carbon cartridge; replace every 12 months",1900,1700,in_stock,AquaPearl 300,
+F25-SET,AquaPearl 250 filter set,AquaPearl 250,filter,"Complete set of four replacement cartridges for the discontinued AquaPearl 250",4200,,low_stock,AquaPearl 250,"Sold until 30 June 2029"
+AEM-H13,HEPA H13 filter,AeroPearl Mini,filter,"Main HEPA H13 filter; replace every 12 months",4500,3990,in_stock,AeroPearl Mini,
+AEM-CF,Carbon pre-filter,AeroPearl Mini,filter,"Odour-absorbing carbon pre-filter; replace every 6 months",1500,,in_stock,AeroPearl Mini,
+AEP-H11,AeroPearl One HEPA filter,AeroPearl One,filter,"Replacement HEPA filter for the discontinued AeroPearl One",3500,,out_of_stock,AeroPearl One,
+ACC-TDS,Digital TDS meter pen,all,accessory,"Pocket meter for checking the total dissolved solids in water",2200,,in_stock,AquaPearl 500 Pro and AquaPearl 300,
+ACC-PRV,Pressure-reducing valve,all,accessory,"Limits inlet pressure to 3.5 bar; required where mains pressure is above 4.0 bar",3200,,in_stock,AquaPearl 500 Pro and AquaPearl 300,
+ACC-SAN,Sanitising tablets (pack of 6),all,accessory,"Food-safe tablets for six-monthly sanitising of the storage tank",1200,,in_stock,AquaPearl 500 Pro and AquaPearl 300,
+ACC-BRK,Spare wall-mount bracket kit,all,accessory,"Wall bracket with four screws and four wall plugs",1500,,in_stock,AquaPearl 500 Pro and AquaPearl 300,
+SVC-INST-M,Professional installation in a metro city,all,service,"Installation by a Pearlz technician in Karachi, Lahore, Islamabad or Rawalpindi",2500,,available,AquaPearl 500 Pro and AquaPearl 300,
+SVC-INST-S,Professional installation in a secondary city,all,service,"Installation by a Pearlz technician in a secondary-tier city",3500,,available,AquaPearl 500 Pro and AquaPearl 300,
+BND-WATER,AquaPearl 500 Pro with annual filter kit,AquaPearl 500 Pro,bundle,"The AquaPearl 500 Pro purifier together with the annual filter kit for its second year",100899,89999,in_stock,,"Bundle price applies only when both items are kept; see the Refund & Returns Policy, Section 8"
+BND-HOME,Home Air and Water bundle,all,bundle,"The AquaPearl 500 Pro purifier together with the AeroPearl Mini air purifier",124998,109999,in_stock,,"Bundle price applies only when both items are kept; see the Refund & Returns Policy, Section 8"
