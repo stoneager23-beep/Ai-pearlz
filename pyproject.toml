@@ -31,6 +31,7 @@ select = [
 "src/ingestion/report.py" = ["T201"]
 "src/ingestion/build_index.py" = ["T201"]
 "src/retrieval/search.py" = ["T201"]
+"src/app_cli.py" = ["T201"]
 "evaluation/**" = ["T201"]
 
 [tool.pytest.ini_options]
